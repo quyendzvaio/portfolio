@@ -24,7 +24,7 @@ export interface Post {
 // committing to git, then redeployed. That is why there is no localStorage overlay
 // for posts any more: an admin edit that only existed in one browser looked like it
 // worked while every visitor kept seeing the old post. Comments are the part that
-// needs a writable store, and those live in MinIO behind the backend.
+// needs a writable store, and those live in Vercel Blob behind the backend.
 const mdFiles = import.meta.glob<string>('../content/*.md', { eager: true, query: '?raw', import: 'default' })
 
 const LS_INDEX = 'portfolio.index.v1'

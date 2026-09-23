@@ -8,8 +8,8 @@ that owns comments, admin login and the LLM call.
 | Piece | Lives where | How it changes |
 | --- | --- | --- |
 | Blog posts | `src/content/*.md`, committed to git | Bundled at build time. Add/edit/delete = commit, push, redeploy. |
-| Comments | MinIO, one JSON object per comment | Via the backend. Anonymous, realtime over SSE. |
-| Admin login | GitHub personal access token | Token in `sessionStorage`; only the repo owner's tokens are accepted. |
+| Comments | Vercel Blob, one JSON object per comment | Via the backend. Anonymous; an open thread re-reads every few seconds. |
+| Admin login | `ADMIN_PASSWORD` → signed session token | Session token in `sessionStorage`; the GitHub write credential stays server-side. |
 | RAG retrieval | Browser (`src/lib/rag.ts`) | TF-IDF + parent/child chunking, no vector DB. |
 | LLM call | Backend → OpenRouter | The key never ships to the browser. |
 | Profile | `src/content/profile.json` | Edit by hand, or from the admin panel, which commits the file for you. |
@@ -33,9 +33,10 @@ one browser.
 Anyone can comment; a name is optional and never verified. The owner can delete any
 comment inline in the thread. Reads are public, deletes require the admin token.
 
-Realtime is Server-Sent Events: the backend writes the object to MinIO, then fans the
-event out to every browser watching that post. The stream reconnects on its own and
-re-fetches on reconnect, so comments posted during a dropout are not lost.
+Freshness is polling, not a stream: an open thread re-reads the comments every few
+seconds (`POLL_MS` in `src/components/Comments.tsx`). The backend runs serverless, so
+an in-process fan-out could not reach a comment written in another instance — a stream
+would go quietly stale instead of failing loudly.
 
 Because writes are open, the backend rate-limits by IP (`COMMENTS_PER_WINDOW`) and
 caps length. If the thread ever gets targeted, add a captcha or moderation queue.
@@ -45,7 +46,7 @@ caps length. If the thread ever gets targeted, add a captcha or moderation queue
 ```bash
 npm install
 
-# 1. backend + MinIO
+# 1. backend
 cp .env.server.example .env.server      # fill it in, see below
 docker compose up -d
 
@@ -54,7 +55,8 @@ cp .env.example .env                    # VITE_API_BASE_URL=http://localhost:878
 npm run dev                             # http://localhost:5173
 ```
 
-Backend without Docker (needs a MinIO reachable at `MINIO_ENDPOINT`):
+Backend without Docker (still needs `BLOB_READ_WRITE_TOKEN`, `ADMIN_PASSWORD` and
+`GITHUB_TOKEN`):
 
 ```bash
 npm run dev:server          # compiles server/ then watches server/dist
@@ -68,11 +70,12 @@ npm run start:server        # run the compiled output
 Everything backend-side lives in `.env.server` (gitignored). Nothing in it reaches the
 browser. The groups:
 
-- **MinIO** — `MINIO_*`. `docker-compose.yml` feeds this same file to the MinIO
-  container, so keep `MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY` identical to
-  `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` or the backend will fail to authenticate.
-- **GitHub repo** — `GITHUB_REPO`, `GITHUB_BRANCH`, `PROFILE_PATH`. The owner half of
-  `GITHUB_REPO` is also the only account allowed into `#/admin`. Missing ⇒ admin login
+- **Vercel Blob** — `BLOB_READ_WRITE_TOKEN`. Comments and the avatar live here, one
+  JSON object per comment. `vercel env pull` writes the token. Missing ⇒ comments and
+  avatar upload are disabled.
+- **Admin** — `ADMIN_PASSWORD`, plus `GITHUB_REPO`, `GITHUB_BRANCH`, `PROFILE_PATH`
+  and `GITHUB_TOKEN`. The password is the only secret the owner types; the token is the
+  repo-write credential and never reaches a browser. Missing any of them ⇒ admin login
   is disabled. No OAuth app and no callback URL are involved.
 - **OpenRouter** — optional. Missing ⇒ chat runs retrieval-only.
 - **`FRONTEND_ORIGIN`** — the exact origin the static site is served from. It must
@@ -82,35 +85,39 @@ browser. The groups:
 
 ```bash
 curl http://localhost:8787/api/health
-# {"ok":true,"storage":true,"oauth":true,"llm":false}
+# {"ok":true,"storage":true,"admin":true,"llm":false}
 ```
 
-## Admin login (personal access token)
+## Admin login (one password)
 
-Set `GITHUB_REPO=owner/name` in `.env.server`. The owner half of that string is the
-admin, so there is no second username variable to keep in sync.
+Set `ADMIN_PASSWORD` in `.env.server` and open `#/admin`. The only thing the browser
+keeps is a signed session token in that tab's `sessionStorage` — the GitHub write
+credential (`GITHUB_TOKEN`) stays on the server, so XSS can at worst ride a session
+until it expires.
 
-Then create a **fine-grained** token at github.com/settings/personal-access-tokens:
+The session token is signed with HMAC and carries its own expiry, so no session state
+lives in server memory. That is what makes login work on a serverless host, where two
+consecutive requests can land in different instances and a session Map would sign the
+owner out at random. `SESSION_SECRET` keys the signature; leave it unset and the key
+is derived from `ADMIN_PASSWORD`, so rotating the password invalidates every
+outstanding session.
 
-1. Repository access → only this repository
-2. Repository permissions → **Contents: Read and write**
-3. Give it an expiry
+`GITHUB_TOKEN` is still required, for the profile editor. Create a **fine-grained**
+token at github.com/settings/personal-access-tokens with **Contents: Read and write**
+scoped to this repository, and give it an expiry.
 
-Paste it into `#/admin`. It is kept in that tab's `sessionStorage`, is never written
-to the server's disk, and is validated against GitHub once per 5 minutes per token
-(cached by hash, so raw tokens never sit in a map or a log).
-
-**Why one token and not OAuth.** The admin panel commits `profile.json`, and an OAuth
+**Why a password and not OAuth.** The admin panel commits `profile.json`, and an OAuth
 `read:user` login cannot write to a repository — so a separate write credential was
-going to be needed either way. Making the PAT do both jobs removes the OAuth app, the
-callback URL, the HTTPS requirement on login, and `SESSION_SECRET`, along with any
-code path that could work half the time.
+going to be needed either way. Keeping that credential server-side instead of in the
+browser removes the OAuth app and the callback URL, and means a stolen browser session
+cannot be used to rewrite the repository.
 
-**Why not a session cookie.** The site is on `*.github.io` and the API is on your VPS,
-which is a different site. A cookie there would be third-party and browsers are
-removing those, so logins would work and then quietly stop. A bearer token is
-unaffected. The trade-off is that XSS could read it, so keep the frontend free of
-injected markup.
+**Why not a session cookie.** The static site can be served from a different origin
+than the API (GitHub Pages plus a VPS, for example), where a cookie would be
+third-party and browsers are removing those — logins would work and then quietly stop.
+A bearer token is unaffected. The trade-off is that XSS could read it, so keep the
+frontend free of injected markup. The Vercel setup below puts both halves on one
+origin, which is the safest version of this.
 
 ## Editing the profile
 
@@ -134,12 +141,21 @@ publishes it. Set a repository **variable** named `VITE_API_BASE_URL` (Settings 
 Secrets and variables → Actions → Variables) to your API URL; without it the deployed
 site builds with comments and admin disabled.
 
-**MinIO image.** MinIO pulled its Docker Hub images in September 2026, and `docker pull
-minio/minio` now fails with a misleading "pull access denied" that looks like a login
-problem. `docker-compose.yml` therefore pulls from `quay.io`, the remaining official
-registry, and pins a specific hotfix tag — `latest` there still resolves to a year-old
-build. Check for a newer tag before deploying, and note that MinIO has deprecated its
-community images, so this moving target is worth revisiting.
+**Frontend + backend → one Vercel project.** `vercel.json` declares two services: the
+static site at `/` and the container backend behind `/api/*`. Both deploy together on
+one domain, so the browser calls the API same-origin and CORS stops being a variable to
+get right. Set `VITE_API_BASE_URL=/` (same-origin), and add `BLOB_READ_WRITE_TOKEN`,
+`ADMIN_PASSWORD`, `GITHUB_REPO` and `GITHUB_TOKEN` as project env vars. The Dockerfile
+needs no changes: `env.ts` reads `PORT`, which is what the platform injects.
+
+Both services build from the same project root, which is the least-exercised part of
+this setup — if Vercel refuses two services from one root, fall back to a second Vercel
+project for the backend and point `VITE_API_BASE_URL` at its URL instead.
+
+Storing comments in Vercel Blob (rather than the previous self-hosted MinIO) also
+retires a moving target: MinIO deprecated its community images, and its Docker Hub
+images already pull with a misleading "pull access denied" that looks like an auth
+problem.
 
 **Backend → your VPS.**
 
@@ -166,8 +182,8 @@ sees real client IPs instead of the proxy's.
   into the client bundle; that is fixed.
 - Comments are unauthenticated and stored in your own bucket. Rate limits are the only
   barrier — worth a captcha if it gets abused.
-- The admin token is a repo-write credential kept in `sessionStorage`. Use a
-  fine-grained token scoped to this one repo with an expiry, and sign out on shared
-  machines.
-- The SSE fan-out is in-process, so run a single backend container. Two replicas would
-  each only notify their own subscribers.
+- The browser holds only a signed session token; the repo-write credential lives in
+  `GITHUB_TOKEN` on the server. Keep it fine-grained and expiring, and sign out on
+  shared machines.
+- Sessions are stateless, so any number of backend instances can serve them, and
+  comment freshness is polling — nothing depends on which instance a request lands in.

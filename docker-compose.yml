@@ -1,53 +1,27 @@
-# MinIO + comments/auth/chat backend.
+# Backend only: comments, admin login and the chat call.
 #
 #   cp .env.server.example .env.server   # then fill it in
 #   docker compose up -d
 #
-# The backend reads everything from .env.server. Values under `environment:` win
-# over that file, which is how the backend reaches MinIO by its service name
-# instead of localhost.
+# The backend reads everything from .env.server.
+#
+# There is no MinIO service any more. Comments and the avatar live in Vercel Blob,
+# which is the same store the deployed site writes to, so local dev needs a token
+# (BLOB_READ_WRITE_TOKEN) rather than a container, a volume and a second set of
+# credentials to keep in sync.
 services:
-  minio:
-    # NOT `minio/minio` — MinIO pulled its Docker Hub images in September 2026 and the
-    # pull fails with a misleading auth-shaped error. Quay is the remaining official
-    # registry. Pinned rather than `latest` because MinIO has deprecated the community
-    # images and `latest` currently points at a year-old build; this hotfix is the
-    # newest published one.
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z.hotfix.7aa24e772
-    command: server /data --console-address ":9001"
-    # MinIO reads MINIO_ROOT_USER / MINIO_ROOT_PASSWORD from this same file, so the
-    # root credentials and the backend's MINIO_ACCESS_KEY can never drift apart.
-    env_file: .env.server
-    ports:
-      - "9000:9000" # S3 API — only needs to be reachable by the backend
-      - "9001:9001" # web console, for poking at buckets by hand
-    volumes:
-      - minio-data:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-    restart: unless-stopped
-
   backend:
     build: .
     env_file: .env.server
     environment:
-      MINIO_ENDPOINT: minio
-      MINIO_PORT: "9000"
-      MINIO_USE_SSL: "false"
       # Set to "1" only when a reverse proxy you control is the only way in.
       TRUST_PROXY: "1"
     ports:
       - "8787:8787"
-    depends_on:
-      minio:
-        condition: service_healthy
     restart: unless-stopped
 
-  # Optional TLS terminator. GitHub only accepts an https:// callback URL, so the
-  # API needs a real certificate. Start it with:
+  # Optional TLS terminator for a VPS deployment. On Vercel this is unnecessary —
+  # the platform terminates TLS for you. Start it with:
   #   docker compose --profile tls up -d
   caddy:
     image: caddy:2-alpine
@@ -65,6 +39,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  minio-data:
   caddy-data:
   caddy-config:

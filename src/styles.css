@@ -97,7 +97,7 @@ button:disabled { opacity: .6; cursor: wait; }
    become its containing block. */
 article.fade-in { position: relative; }
 .post-body { position: relative; z-index: 1; }
-/* Comments (MinIO-backed thread) */
+/* Comments (Blob-backed thread) */
 .comment-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .live { display: inline-flex; align-items: center; gap: 6px; font-size: .75rem; letter-spacing: .04em;
   text-transform: uppercase; color: var(--muted); }

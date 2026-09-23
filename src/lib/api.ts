@@ -1,10 +1,14 @@
 // The one place that knows the backend contract. Everything else in src/ talks to
 // this instead of calling fetch directly, so the API shape lives in exactly one file.
 
-const base = (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/$/, '')
+// A '/' (or any relative) value means same-origin: the backend is deployed as a
+// service beside this site — see vercel.json — so requests go to /api/* on whatever
+// host served the page, and preview deployments need no separate URL.
+const rawBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim()
+const base = rawBase.replace(/\/$/, '')
 
 /** False when the site is built without a backend URL — callers show setup help. */
-export const apiConfigured = (): boolean => base.length > 0
+export const apiConfigured = (): boolean => rawBase.length > 0
 
 const TOKEN_KEY = 'portfolio.admin.token'
 
@@ -102,10 +106,6 @@ export const deleteComment = (slug: string, id: string) =>
   request<{ ok: true }>(`/api/comments/${encodeURIComponent(slug)}/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   })
-
-/** SSE endpoint for one post's thread. Public — reading needs no token. */
-export const commentsStreamUrl = (slug: string): string =>
-  `${requireBase()}/api/comments/stream?slug=${encodeURIComponent(slug)}`
 
 // ----------------------------------------------------------------------- auth
 

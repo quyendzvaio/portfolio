@@ -103,48 +103,15 @@ function publicOrigin(req: IncomingMessage): string {
   return `${proto}://${req.headers.host ?? `localhost:${env.port}`}`
 }
 
-// ------------------------------------------------------------------ SSE fan-out
-
-interface StreamClient {
-  slug: string
-  res: ServerResponse
-}
-
-const streams = new Set<StreamClient>()
-
-function broadcast(slug: string, event: string, data: unknown): void {
-  const frame = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
-  for (const client of streams) {
-    if (client.slug === slug) client.res.write(frame)
-  }
-}
-
-// Single-process fan-out: fine for one backend container. Two replicas would each
-// only notify their own subscribers, so scaling out needs a shared bus (Redis/NATS).
-function streamComments(req: IncomingMessage, res: ServerResponse, slug: string): void {
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream; charset=utf-8',
-    'Cache-Control': 'no-cache, no-transform',
-    Connection: 'keep-alive',
-    // Stops nginx from buffering the stream into oblivion.
-    'X-Accel-Buffering': 'no',
-  })
-  res.write(': connected\n\n')
-
-  const client: StreamClient = { slug, res }
-  streams.add(client)
-  const heartbeat = setInterval(() => res.write(': ping\n\n'), 25_000)
-  const drop = () => {
-    clearInterval(heartbeat)
-    streams.delete(client)
-  }
-  req.on('close', drop)
-  res.on('close', drop)
-}
+// No SSE endpoint any more. The backend runs serverless, where an in-process
+// subscriber set only ever sees the requests that landed in the same instance, so a
+// stream could not be told about a comment written elsewhere. Readers poll instead
+// (see the interval in src/components/Comments.tsx), which costs nothing at blog
+// scale and keeps working through a dropped connection for free.
 
 function requireStorage(): void {
   if (!storageReady()) {
-    throw new HttpError(503, 'MinIO is not configured on the server. Set MINIO_* env vars.')
+    throw new HttpError(503, 'Vercel Blob is not configured on the server. Set BLOB_READ_WRITE_TOKEN.')
   }
 }
 
@@ -213,13 +180,6 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return
   }
 
-  if (path === '/api/comments/stream' && method === 'GET') {
-    const slug = url.searchParams.get('slug') ?? ''
-    if (!storage.validSlug(slug)) throw new HttpError(400, 'Missing or invalid slug')
-    streamComments(req, res, slug)
-    return
-  }
-
   if (path === '/api/comments' && method === 'POST') {
     requireStorage()
     if (rateLimited(`comment:${clientIp(req)}`, env.limits.commentsPerWindow, env.limits.windowMs)) {
@@ -260,7 +220,6 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       ...(parentId ? { parentId } : {}),
     }
     await storage.putComment(comment)
-    broadcast(slug, 'created', comment)
     json(res, 201, { comment })
     return
   }
@@ -287,7 +246,6 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       ...comment,
       reactions: { ...comment.reactions, [viewer]: reactions },
     }))
-    broadcast(slug, 'updated', updated)
     json(res, 200, { comment: updated })
     return
   }
@@ -300,7 +258,6 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     const id = decodeURIComponent(deleteMatch[2])
     if (!storage.validSlug(slug) || !storage.validId(id)) throw new HttpError(400, 'Invalid comment id')
     await storage.removeComment(slug, id)
-    broadcast(slug, 'deleted', { id })
     json(res, 200, { ok: true })
     return
   }
@@ -410,18 +367,12 @@ const server = createServer((req, res) => {
 async function main(): Promise<void> {
   const report = configReport()
   console.log(`[server] frontend origin: ${env.frontendOrigin}`)
-  console.log(`[server] MinIO:      ${report.storage ? 'configured' : 'MISSING → comments and avatar upload disabled'}`)
+  console.log(`[server] Blob:       ${report.storage ? 'configured' : 'MISSING → comments and avatar upload disabled'}`)
   console.log(`[server] GitHub repo:${report.admin ? ` ${env.github.repo} (branch ${env.github.branch})` : ' MISSING → admin login disabled'}`)
   console.log(`[server] OpenRouter: ${report.llm ? 'configured' : 'MISSING → chat runs retrieval-only'}`)
 
-  if (report.storage) {
-    try {
-      await storage.ensureBucket()
-      console.log(`[server] bucket "${env.minio.bucket}" ready`)
-    } catch (error) {
-      console.error('[server] could not reach MinIO / prepare the bucket:', error)
-    }
-  }
+  // No bucket to prepare any more: Blob needs a token, not a container, and a
+  // missing token is already reported by the line above.
 
   server.listen(env.port, () => console.log(`[server] listening on port ${env.port}`))
 }

@@ -23,18 +23,20 @@ export const env = {
   // request claim to be https.
   trustProxy: bool('TRUST_PROXY', false),
 
-  minio: {
-    endPoint: str('MINIO_ENDPOINT'),
-    port: num('MINIO_PORT', 9000),
-    useSSL: bool('MINIO_USE_SSL', false),
-    accessKey: str('MINIO_ACCESS_KEY'),
-    secretKey: str('MINIO_SECRET_KEY'),
-    bucket: str('MINIO_BUCKET', 'portfolio'),
+  // Vercel Blob replaced MinIO. A serverless host mounts no disk, so a self-hosted
+  // object store had nowhere to live; Blob is the same platform as the deployment
+  // and its free allowance (1 GB) is far past a portfolio's comments and one avatar.
+  blob: {
+    token: str('BLOB_READ_WRITE_TOKEN'),
   },
 
   admin: {
     // The one secret the admin types. Empty disables admin login entirely.
     password: str('ADMIN_PASSWORD'),
+    // Keys the signed session tokens. Optional: without it the key is derived from
+    // ADMIN_PASSWORD, so the only mandatory secret stays the one the owner types.
+    // Rotating the password then invalidates every outstanding session for free.
+    sessionSecret: str('SESSION_SECRET'),
     sessionTtlMs: num('SESSION_TTL_HOURS', 24 * 7) * 3_600_000,
   },
 
@@ -67,8 +69,7 @@ export const env = {
   },
 }
 
-export const storageReady = (): boolean =>
-  Boolean(env.minio.endPoint && env.minio.accessKey && env.minio.secretKey)
+export const storageReady = (): boolean => Boolean(env.blob.token)
 
 /** Admin login needs a password to check and repo coordinates plus a token to commit with. */
 export const adminReady = (): boolean =>

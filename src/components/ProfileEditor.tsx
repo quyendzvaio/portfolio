@@ -58,7 +58,7 @@ export default function ProfileEditor() {
     try {
       const { url } = await uploadAvatar(file)
       setForm((p) => ({ ...p, avatar: url }))
-      setStatus('Avatar uploaded to MinIO. Save to commit it into profile.json.')
+      setStatus('Avatar uploaded to Blob storage. Save to commit it into profile.json.')
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -117,7 +117,7 @@ export default function ProfileEditor() {
               onChange={(e) => e.target.files?.[0] && void onAvatarFile(e.target.files[0])}
             />
           </label>
-          <span className="muted small">PNG/JPEG/WebP/GIF, up to 2 MB → stored in MinIO</span>
+          <span className="muted small">PNG/JPEG/WebP/GIF, up to 2 MB → stored in Blob storage</span>
         </div>
 
         <label>LinkedIn<input value={form.linkedin} onChange={(e) => set('linkedin', e.target.value)} /></label>

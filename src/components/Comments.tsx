@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import type { RefObject } from 'react'
 import {
   apiConfigured,
-  commentsStreamUrl,
   createComment,
   deleteComment,
   getMe,
@@ -26,6 +25,11 @@ const EMOJI: Record<ReactionKind, string> = {
 }
 
 const byNewest = (a: ApiComment, b: ApiComment) => a.createdAt.localeCompare(b.createdAt)
+
+// How often an open thread re-reads the comments. The backend is serverless, so its
+// in-process fan-out cannot reach a comment written in another instance; a few
+// seconds is imperceptible on a blog post and needs no reconnect handling.
+const POLL_MS = 5000
 
 const when = (iso: string) => {
   const at = new Date(iso)
@@ -109,33 +113,17 @@ export default function Comments({
       .catch(() => setAdmin(false))
   }, [slug, load])
 
-  // EventSource reconnects on its own. Re-fetching on every (re)open means a dropped
-  // connection cannot silently hide comments that landed while we were offline.
+  // Polling replaced the SSE stream. `load` already swaps in the whole thread, so a
+  // comment created in another tab, edited by a reaction, or deleted by the owner
+  // all land through the same path — no event-type handlers to keep in sync.
   useEffect(() => {
     if (!apiConfigured()) return
-    const source = new EventSource(commentsStreamUrl(slug))
-
-    source.addEventListener('open', () => {
-      setLive(true)
-      void load()
-    })
-    source.addEventListener('error', () => setLive(false))
-    source.addEventListener('created', (event) => {
-      const incoming = JSON.parse((event as MessageEvent).data) as ApiComment
-      setComments((current) =>
-        current.some((c) => c.id === incoming.id) ? current : [...current, incoming].sort(byNewest),
-      )
-    })
-    source.addEventListener('updated', (event) => {
-      const incoming = JSON.parse((event as MessageEvent).data) as ApiComment
-      setComments((current) => current.map((c) => (c.id === incoming.id ? { ...c, ...incoming } : c)))
-    })
-    source.addEventListener('deleted', (event) => {
-      const { id } = JSON.parse((event as MessageEvent).data) as { id: string }
-      setComments((current) => current.filter((c) => c.id !== id))
-    })
-
-    return () => source.close()
+    setLive(true)
+    const timer = setInterval(() => void load(), POLL_MS)
+    return () => {
+      clearInterval(timer)
+      setLive(false)
+    }
   }, [slug, load])
 
   // Click-away and Escape close the kebab menu and the reaction bar. The quote
@@ -192,7 +180,8 @@ export default function Comments({
       setReplyTo(null)
       setQuoted(null)
       setQuotePos(null)
-      // The SSE broadcast usually beats this response, so insert defensively.
+      // Insert now rather than waiting for the next poll, so this comment appears
+      // the instant it is accepted.
       setComments((current) =>
         current.some((c) => c.id === result.comment.id)
           ? current
@@ -348,7 +337,7 @@ export default function Comments({
       )}
       <div className="comment-head">
         <h3>Discuss this post</h3>
-        <span className={`live ${live ? 'on' : ''}`} title={live ? 'Connected — new comments appear instantly' : 'Reconnecting…'}>
+        <span className={`live ${live ? 'on' : ''}`} title={live ? 'Auto-refreshing every few seconds' : 'Auto-refresh paused'}>
           <span className="live-dot" />
           {live ? 'live' : 'offline'}
         </span>
@@ -411,7 +400,7 @@ export default function Comments({
           <button onClick={submit} disabled={sending || !body.trim()}>
             {sending ? 'Posting…' : replyTo ? 'Post reply' : 'Post comment'}
           </button>
-          <span className="muted small">Ctrl/⌘ + Enter to post · stored in MinIO</span>
+          <span className="muted small">Ctrl/⌘ + Enter to post · stored in Blob storage</span>
         </div>
       </div>
     </section>
