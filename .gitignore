@@ -1,0 +1,8 @@
+node_modules/
+dist/
+server/dist/
+.env
+.env.server
+
+# CodeGraph index: local per-machine daemon state (db, sock, pid, log).
+.codegraph/

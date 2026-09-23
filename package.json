@@ -1,0 +1,28 @@
+{
+  "name": "portfolio",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:server": "tsc -p server/tsconfig.json && node --watch server/dist/index.js",
+    "build": "tsc --noEmit && vite build",
+    "build:server": "tsc -p server/tsconfig.json",
+    "typecheck:server": "tsc -p server/tsconfig.json --noEmit",
+    "start:server": "node server/dist/index.js",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "minio": "^8.0.7",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.4",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.7"
+  }
+}

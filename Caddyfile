@@ -1,0 +1,5 @@
+# Used only by the optional `caddy` service (docker compose --profile tls up -d).
+# CADDY_DOMAIN comes from .env.server and must resolve to this host's public IP.
+{$CADDY_DOMAIN} {
+	reverse_proxy backend:8787
+}
