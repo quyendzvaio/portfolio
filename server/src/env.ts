@@ -57,6 +57,8 @@ export const env = {
     siteUrl: str('OPENROUTER_SITE_URL'),
     // A hung provider would otherwise hold the request (and the visitor) open forever.
     timeoutMs: num('OPENROUTER_TIMEOUT_MS', 30_000),
+    // Caps each answer's length, which bounds both its cost and its latency.
+    maxTokens: num('OPENROUTER_MAX_TOKENS', 400),
   },
 
   limits: {

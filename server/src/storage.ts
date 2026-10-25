@@ -1,4 +1,4 @@
-import { del, get, list, put } from '@vercel/blob'
+import { BlobNotFoundError, del, get, head, list, put } from '@vercel/blob'
 import { env, storageReady } from './env.js'
 
 export interface Comment {
@@ -20,11 +20,18 @@ export interface Comment {
 // Layout: comments/{slug}/{id}.json — one object per comment.
 // Deliberately NOT one JSON array per post: create and delete stay single-object
 // writes, so two visitors commenting at the same moment can never clobber each
-// other. The cost is one list + N gets per read, which is nothing at blog scale.
-// Add a per-post summary object here if a post ever has thousands of comments.
+// other.
+//
+// Reading a thread costs one list + one get per comment, and Blob's Hobby tier
+// includes only 2,000 list-class ("advanced") operations a month, after which the
+// store is blocked for 30 days. So reads go through a version marker instead:
+// comment-versions/{slug}.json is rewritten on every change to the thread, a reader
+// checks it with head() (a "simple" operation, 10,000 included), and the full list
+// only runs when the version moved. Polls of an unchanged thread cost one head.
 const basePrefix = 'comments/'
 const slugPrefix = (slug: string) => `${basePrefix}${slug}/`
 const commentKey = (slug: string, id: string) => `${slugPrefix(slug)}${id}.json`
+const versionKey = (slug: string) => `comment-versions/${slug}.json`
 
 const SLUG_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,80}$/
 const ID_RE = /^[a-zA-Z0-9-]{1,64}$/
@@ -90,14 +97,59 @@ function parseComment(raw: string): Comment | null {
   }
 }
 
-export async function listComments(slug: string): Promise<Comment[]> {
+/**
+ * The thread's current version: the marker's etag, or 'none' for a thread that has
+ * never changed since markers were introduced (its first write creates one).
+ */
+export async function threadVersion(slug: string): Promise<string> {
+  try {
+    const meta = await head(versionKey(slug), blobOptions())
+    return meta.etag || meta.uploadedAt.toISOString()
+  } catch (error) {
+    if (error instanceof BlobNotFoundError) return 'none'
+    throw error
+  }
+}
+
+/** Called after every write to a thread, so readers see the version move. */
+async function bumpVersion(slug: string): Promise<void> {
+  await put(versionKey(slug), JSON.stringify({ at: Date.now() }), {
+    ...blobOptions(),
+    contentType: 'application/json',
+    allowOverwrite: true,
+  })
+  threads.delete(slug)
+}
+
+// Per-instance cache of whole threads, keyed by version. Bounded because slugs come
+// from the request (any well-formed slug can be asked for, existing post or not).
+const MAX_CACHED_THREADS = 200
+const threads = new Map<string, { version: string; comments: Comment[] }>()
+
+/**
+ * The whole thread at `version` (looked up when not given). Served from the cache
+ * when the version matches; otherwise one list + one get per comment.
+ */
+export async function readThread(slug: string, version?: string): Promise<{ version: string; comments: Comment[] }> {
+  const current = version ?? (await threadVersion(slug))
+  const cached = threads.get(slug)
+  if (cached && cached.version === current) return cached
   const keys = (await listKeys(slugPrefix(slug))).filter((key) => key.endsWith('.json'))
   const raws = await Promise.all(keys.map((key) => readText(key)))
-  return raws
+  const comments = raws
     .filter((raw): raw is string => raw !== null)
     .map(parseComment)
     .filter((comment): comment is Comment => comment !== null)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  const thread = { version: current, comments }
+  threads.delete(slug) // re-insert so the Map's order is least-recently-read first
+  threads.set(slug, thread)
+  if (threads.size > MAX_CACHED_THREADS) threads.delete(threads.keys().next().value!)
+  return thread
+}
+
+export async function listComments(slug: string): Promise<Comment[]> {
+  return (await readThread(slug)).comments
 }
 
 export async function putComment(comment: Comment): Promise<void> {
@@ -107,10 +159,12 @@ export async function putComment(comment: Comment): Promise<void> {
     // A reaction toggle rewrites this exact pathname, which Blob refuses by default.
     allowOverwrite: true,
   })
+  await bumpVersion(comment.slug)
 }
 
 export async function removeComment(slug: string, id: string): Promise<void> {
   await del(commentKey(slug, id), blobOptions())
+  await bumpVersion(slug)
 }
 
 /** Anonymous viewer identity, stored in localStorage and sent with reaction toggles. */
@@ -125,7 +179,9 @@ export async function updateComment(
   id: string,
   mutate: (comment: Comment) => Comment,
 ): Promise<Comment | null> {
-  const existing = (await listComments(slug)).find((comment) => comment.id === id)
+  // One get of this comment, not the thread: fresher (no cache) and cheaper.
+  const raw = await readText(commentKey(slug, id))
+  const existing = raw === null ? null : parseComment(raw)
   if (!existing) return null
   const next = mutate(existing)
   await putComment(next)

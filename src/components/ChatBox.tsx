@@ -5,6 +5,9 @@ import { apiConfigured, askChat, getChatStatus } from '../lib/api'
 
 interface Msg { role: 'user' | 'ai'; text: string }
 
+/** Answers already paid for in this visit, keyed by question + retrieved sections. */
+const answers = new Map<string, string>()
+
 export default function ChatBox() {
   const [log, setLog] = useState<Msg[]>([])
   const [q, setQ] = useState('')
@@ -31,8 +34,15 @@ export default function ChatBox() {
     // Retrieval stays in the browser; only the model call goes to the backend, which
     // is what keeps the OpenRouter key out of the shipped JavaScript.
     const hits = rerank(query, retrieve(query, getIndex()))
+    // The model is only called when it has something to ground on: with no hits the
+    // local "not found" answer is the right one and costs nothing. Repeated questions
+    // in this visit reuse their answer.
+    const key = `${query.toLowerCase()}\u0000${hits.map((h) => h.id).join(',')}`
     try {
-      const answer = llmEnabled ? (await askChat(query, hits)).answer : fallbackAnswer(query, hits)
+      const answer = !llmEnabled || !hits.length
+        ? fallbackAnswer(query, hits)
+        : answers.get(key) ?? (await askChat(query, hits)).answer
+      if (llmEnabled && hits.length) answers.set(key, answer)
       setLog((l) => [...l, { role: 'ai', text: answer }])
     } catch (e) {
       setLog((l) => [...l, {

@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { adminReady, configReport, env, llmReady, storageReady } from './env.js'
 import * as storage from './storage.js'
 import { githubToken, login, sessionFor } from './auth.js'
@@ -14,6 +14,14 @@ class HttpError extends Error {
 }
 
 const MAX_JSON_BYTES = 16 * 1024
+
+// Portfolio visitors ask the same few questions ("what do you work on?"). The same
+// question over the same retrieved sections gets the same answer, so it is kept for a
+// day instead of paying the model again. Per instance and bounded; a cold instance
+// simply asks the model once more.
+const ANSWER_TTL_MS = 24 * 60 * 60 * 1000
+const MAX_CACHED_ANSWERS = 300
+const answers = new Map<string, { answer: string; at: number }>()
 const MAX_CONTEXT_CHUNKS = 5
 const MAX_CONTEXT_CHARS = 4000
 
@@ -202,7 +210,16 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     const slug = url.searchParams.get('slug') ?? ''
     if (!storage.validSlug(slug)) throw new HttpError(400, 'Missing or invalid slug')
     requireStorage()
-    json(res, 200, { comments: await storage.listComments(slug) })
+    // ?since=<version> is what a polling reader sends. An unchanged thread answers
+    // from one head() of the version marker; see storage.ts for why that matters.
+    const version = await storage.threadVersion(slug)
+    const since = url.searchParams.get('since')
+    if (since && since === version) {
+      json(res, 200, { version, unchanged: true })
+      return
+    }
+    const thread = await storage.readThread(slug, version)
+    json(res, 200, { version: thread.version, comments: thread.comments })
     return
   }
 
@@ -386,6 +403,12 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         source: clean(chunk?.source, 200),
         text: clean(chunk?.text, MAX_CONTEXT_CHARS),
       }))
+    const key = createHash('sha256').update(JSON.stringify([query.toLowerCase(), context])).digest('hex')
+    const cached = answers.get(key)
+    if (cached && Date.now() - cached.at < ANSWER_TTL_MS) {
+      json(res, 200, { answer: cached.answer, cached: true })
+      return
+    }
     const answer = await ask(query, context).catch((error: unknown) => {
       // A provider timeout is an expected outcome: one log line, and the client
       // falls back to raw retrieval.
@@ -394,6 +417,9 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       }
       throw error
     })
+    answers.delete(key)
+    answers.set(key, { answer, at: Date.now() })
+    if (answers.size > MAX_CACHED_ANSWERS) answers.delete(answers.keys().next().value!)
     json(res, 200, { answer })
     return
   }

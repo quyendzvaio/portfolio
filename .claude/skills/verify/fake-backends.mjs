@@ -26,6 +26,14 @@ const header = (opts, name) => {
 const api = agent.get('https://vercel.com')
 api.intercept({ path: (p) => p.startsWith('/api/blob'), method: () => true }).reply((opts) => {
   const url = new URL(opts.path, 'https://vercel.com')
+  if (opts.method === 'GET' && url.searchParams.has('url')) {
+    // head(): metadata for one pathname, or not_found
+    const p = url.searchParams.get('url')
+    const b = blobs.get(p)
+    log('head', p, b ? 'hit' : 'miss')
+    if (!b) return { statusCode: 404, data: JSON.stringify({ error: { code: 'not_found', message: 'not found' } }), responseOptions: { headers: { 'content-type': 'application/json' } } }
+    return { statusCode: 200, data: JSON.stringify({ ...meta(p), etag: `"${b.uploadedAt}"`, contentType: b.contentType, contentDisposition: 'inline', cacheControl: 'no-store' }), responseOptions: { headers: { 'content-type': 'application/json' } } }
+  }
   if (opts.method === 'GET') {
     const prefix = url.searchParams.get('prefix') ?? ''
     const list = [...blobs.keys()].filter((k) => k.startsWith(prefix)).sort().map(meta)
@@ -79,7 +87,7 @@ gh.intercept({ path: (p) => p.includes('/contents/'), method: 'PUT' }).reply((op
 
 // --- OpenRouter: FAKE_LLM_DELAY_MS delays the answer (to exercise OPENROUTER_TIMEOUT_MS)
 agent.get('https://openrouter.ai').intercept({ path: (p) => p.endsWith('/chat/completions'), method: 'POST' })
-  .reply(200, () => { log('llm answered'); return JSON.stringify({ choices: [{ message: { content: 'fake answer' } }] }) }, { headers: { 'content-type': 'application/json' } })
+  .reply(200, (opts) => { const b = JSON.parse(toBuf(opts.body).toString()); log('llm answered', `max_tokens=${b.max_tokens}`, `temperature=${b.temperature}`); return JSON.stringify({ choices: [{ message: { content: 'fake answer' } }] }) }, { headers: { 'content-type': 'application/json' } })
   .delay(Math.max(1, Number(process.env.FAKE_LLM_DELAY_MS ?? 1))).persist()
 
 // Seed: one legacy avatar (pre-versioning layout), to check old URLs keep working.

@@ -26,6 +26,10 @@ export async function ask(query: string, context: ContextChunk[]): Promise<strin
     },
     body: JSON.stringify({
       model: env.llm.model,
+      // Output is the expensive half of a call and the slow half too: a short, capped,
+      // low-temperature answer is what a grounded portfolio chat needs.
+      max_tokens: env.llm.maxTokens,
+      temperature: 0.2,
       messages: [
         { role: 'system', content: systemPrompt() },
         {

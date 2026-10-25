@@ -23,6 +23,6 @@ Vite + React 19 + TS static frontend (`src/`) + small Node backend (`server/src/
 
 ## Conventions / gotchas
 - Source of truth is `README.md` + `server/src/env.ts` + `server/src/index.ts`. `PRD.md` / `plan.md` describe an obsolete design (Giscus, SSE, MinIO, OAuth, client-side key) — do not follow them. Blob (`BLOB_READ_WRITE_TOKEN`) is the only storage.
-- Comments are polling (`POLL_MS` in `src/components/Comments.tsx`), not SSE/streams — serverless fan-out can't reach other instances.
+- Comments are polling (`POLL_MIN_MS`/`POLL_MAX_MS` in `src/components/Comments.tsx`, only while the thread is on screen), not SSE/streams — serverless fan-out can't reach other instances. Polls send `?since=<version>`, and the backend answers from a version-marker `head()`: never add a per-poll `list` (Blob Hobby includes 2,000 list-class ops/month).
 - Admin = one password (`ADMIN_PASSWORD`) → HMAC-signed token in tab `sessionStorage` (no cookies: frontend and API may be cross-origin). `GITHUB_TOKEN` never leaves the server. Profile `PUT` merges over an allow-list (`http(s)/mailto:/tel:` only) — hand-added keys in `profile.json` survive admin saves.
 - Local dev: `cp .env.server.example .env.server` + `cp .env.example .env`, then `docker compose up -d` and `npm run dev`. VPS TLS: `docker compose --profile tls up -d` (needs `CADDY_DOMAIN`); or point own proxy at `8787` with `TRUST_PROXY=1`. Never commit `.env` / `.env.server`; never put secrets in `VITE_*` vars.

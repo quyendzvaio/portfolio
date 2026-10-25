@@ -26,10 +26,14 @@ const EMOJI: Record<ReactionKind, string> = {
 
 const byNewest = (a: ApiComment, b: ApiComment) => a.createdAt.localeCompare(b.createdAt)
 
-// How often an open thread re-reads the comments. The backend is serverless, so its
-// in-process fan-out cannot reach a comment written in another instance; a few
-// seconds is imperceptible on a blog post and needs no reconnect handling.
-const POLL_MS = 5000
+// Polling, not a stream: the backend is serverless, so an in-process fan-out cannot
+// reach a comment written in another instance. A poll runs only while the thread is
+// on screen in a visible tab, starts every POLL_MIN_MS and backs off toward
+// POLL_MAX_MS while nothing changes; any change or own action resets it. Each poll
+// sends the last version, so a quiet thread costs one cheap check on the backend.
+const POLL_MIN_MS = 5000
+const POLL_MAX_MS = 30000
+const POLL_BACKOFF = 1.6
 
 const when = (iso: string) => {
   const at = new Date(iso)
@@ -83,14 +87,22 @@ export default function Comments({
   const [replyTo, setReplyTo] = useState<ApiComment | null>(null)
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [hoverReactions, setHoverReactions] = useState<string | null>(null)
+  const sectionRef = useRef<HTMLElement>(null)
+  const versionRef = useRef('')
+  const pollDelay = useRef(POLL_MIN_MS)
 
-  const load = useCallback(async () => {
+  /** Fetches the thread unless it is unchanged; true when something new arrived. */
+  const load = useCallback(async (): Promise<boolean> => {
     try {
-      const result = await listComments(slug)
-      setComments(result.comments)
+      const result = await listComments(slug, versionRef.current || undefined)
       setError('')
+      if (result.unchanged || !result.comments) return false
+      versionRef.current = result.version
+      setComments(result.comments)
+      return true
     } catch (e) {
       setError((e as Error).message)
+      return false
     } finally {
       setLoading(false)
     }
@@ -103,6 +115,8 @@ export default function Comments({
     }
     setLoading(true)
     setComments([])
+    versionRef.current = ''
+    pollDelay.current = POLL_MIN_MS
     setQuoted(null)
     setQuotePos(null)
     setReplyTo(null)
@@ -113,25 +127,44 @@ export default function Comments({
       .catch(() => setAdmin(false))
   }, [slug, load])
 
-  // Polling replaced the SSE stream. `load` already swaps in the whole thread, so a
-  // comment created in another tab, edited by a reaction, or deleted by the owner
-  // all land through the same path — no event-type handlers to keep in sync.
-  // A hidden tab skips its polls (each one is a Blob list + one read per comment) and
-  // catches up the moment it becomes visible again.
+  // `load` swaps in the whole thread, so a comment created in another tab, edited by
+  // a reaction, or deleted by the owner all land through the same path. Readers who
+  // never scroll to the thread cost only the first load.
   useEffect(() => {
-    if (!apiConfigured()) return
-    setLive(!document.hidden)
-    const timer = setInterval(() => {
-      if (!document.hidden) void load()
-    }, POLL_MS)
-    const onVisibility = () => {
-      setLive(!document.hidden)
-      if (!document.hidden) void load()
+    if (!apiConfigured() || !sectionRef.current) return
+    let onScreen = false
+    let timer = 0
+    let stopped = false
+    const active = () => onScreen && !document.hidden
+    const schedule = () => {
+      window.clearTimeout(timer)
+      if (!stopped && active()) timer = window.setTimeout(tick, pollDelay.current)
     }
-    document.addEventListener('visibilitychange', onVisibility)
+    const tick = async () => {
+      const changed = await load()
+      pollDelay.current = changed ? POLL_MIN_MS : Math.min(POLL_MAX_MS, pollDelay.current * POLL_BACKOFF)
+      schedule()
+    }
+    // Coming back on screen catches up at once, then polls from the fast end again.
+    const resume = () => {
+      setLive(active())
+      window.clearTimeout(timer)
+      if (!active()) return
+      pollDelay.current = POLL_MIN_MS
+      void tick()
+    }
+    const observer = new IntersectionObserver(([entry]) => {
+      const was = onScreen
+      onScreen = entry.isIntersecting
+      if (onScreen !== was) resume()
+    })
+    observer.observe(sectionRef.current)
+    document.addEventListener('visibilitychange', resume)
     return () => {
-      clearInterval(timer)
-      document.removeEventListener('visibilitychange', onVisibility)
+      stopped = true
+      window.clearTimeout(timer)
+      observer.disconnect()
+      document.removeEventListener('visibilitychange', resume)
       setLive(false)
     }
   }, [slug, load])
@@ -192,6 +225,7 @@ export default function Comments({
       setQuotePos(null)
       // Insert now rather than waiting for the next poll, so this comment appears
       // the instant it is accepted.
+      pollDelay.current = POLL_MIN_MS
       setComments((current) =>
         current.some((c) => c.id === result.comment.id)
           ? current
@@ -208,6 +242,7 @@ export default function Comments({
     if (!confirm(`Delete the comment from ${comment.name}?`)) return
     try {
       await deleteComment(slug, comment.id)
+      pollDelay.current = POLL_MIN_MS
       setComments((current) => current.filter((c) => c.id !== comment.id))
     } catch (e) {
       setError((e as Error).message)
@@ -221,6 +256,7 @@ export default function Comments({
     const next = current.includes(kind) ? current.filter((k) => k !== kind) : [...current, kind]
     try {
       const result = await toggleReaction(slug, comment.id, viewer, next)
+      pollDelay.current = POLL_MIN_MS
       setError('')
       setComments((all) => all.map((c) => (c.id === comment.id ? result.comment : c)))
     } catch (e) {
@@ -297,7 +333,7 @@ export default function Comments({
   const roots = comments.filter((c) => !c.parentId || !ids.has(c.parentId))
 
   return (
-    <section className="card">
+    <section className="card" ref={sectionRef}>
       {/* The instant popup is portaled into the <article> so its absolute top/left
           are measured from the article itself — see portalEl above for why. */}
       {quoted && quotePos && portalEl && createPortal(
@@ -336,7 +372,7 @@ export default function Comments({
       )}
       <div className="comment-head">
         <h3>Discuss this post</h3>
-        <span className={`live ${live ? 'on' : ''}`} title={live ? 'Auto-refreshing every few seconds' : 'Auto-refresh paused'}>
+        <span className={`live ${live ? 'on' : ''}`} title={live ? 'Auto-refreshing while this thread is on screen' : 'Auto-refresh paused'}>
           <span className="live-dot" />
           {live ? 'live' : 'offline'}
         </span>

@@ -78,8 +78,15 @@ async function request<T>(path: string, init: RequestInit = {}, tokenOverride?: 
 
 // ------------------------------------------------------------------- comments
 
-export const listComments = (slug: string) =>
-  request<{ comments: ApiComment[] }>(`/api/comments?slug=${encodeURIComponent(slug)}`)
+/**
+ * The thread, or `{ unchanged: true }` when it still matches `since` (the version a
+ * previous call returned). Polls pass `since`, so a quiet thread costs the backend a
+ * single cheap metadata check.
+ */
+export const listComments = (slug: string, since?: string) =>
+  request<{ version: string; comments?: ApiComment[]; unchanged?: true }>(
+    `/api/comments?slug=${encodeURIComponent(slug)}${since ? `&since=${encodeURIComponent(since)}` : ''}`,
+  )
 
 export const createComment = (
   slug: string,

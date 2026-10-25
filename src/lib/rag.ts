@@ -78,27 +78,55 @@ export function chunkParentChild(source: string, sourceSlug: string, text: strin
   return out
 }
 
+// Everything about the index that does not depend on the query, computed once per
+// index instead of once per question: per-chunk term counts, document frequencies,
+// title terms and folded text. Re-tokenizing every chunk on every question made a
+// query cost grow with the whole blog (75 ms at 200 posts).
+interface Prepared {
+  tf: Map<string, number>[]
+  len: number[]
+  df: Map<string, number>
+  titles: Set<string>[]
+  folded: string[]
+}
+const prepared = new WeakMap<Chunk[], Prepared>()
+
+function prepare(chunks: Chunk[]): Prepared {
+  const hit = prepared.get(chunks)
+  if (hit) return hit
+  const df = new Map<string, number>()
+  const tf: Map<string, number>[] = []
+  const len: number[] = []
+  for (const c of chunks) {
+    const d = tok(c.source + ' ' + c.text)
+    const counts = new Map<string, number>()
+    for (const w of d) counts.set(w, (counts.get(w) ?? 0) + 1)
+    for (const w of counts.keys()) df.set(w, (df.get(w) ?? 0) + 1)
+    tf.push(counts)
+    len.push(d.length)
+  }
+  const result = { tf, len, df, titles: chunks.map((c) => new Set(tok(c.source))), folded: chunks.map((c) => fold(c.text)) }
+  prepared.set(chunks, result)
+  return result
+}
+
 // Retrieve: score children with TF-IDF, keep best child per parent,
 // return top-k parents (full-section context).
 export function retrieve(query: string, chunks: Chunk[], k = 10): ScoredChunk[] {
   const q = tok(query)
   if (!q.length || !chunks.length) return []
-  const df = new Map<string, number>()
-  const docs = chunks.map((c) => tok(c.source + ' ' + c.text))
-  for (const d of docs) for (const w of new Set(d)) df.set(w, (df.get(w) ?? 0) + 1)
-  const N = docs.length
+  const { tf: tfs, len, df, titles, folded } = prepare(chunks)
+  const N = chunks.length
   const best = new Map<string, { chunk: Chunk; score: number }>()
   chunks.forEach((c, i) => {
-    const d = docs[i]
-    const tf = new Map<string, number>()
-    for (const w of d) tf.set(w, (tf.get(w) ?? 0) + 1)
+    const tf = tfs[i]
     let s = 0
     for (const w of q) {
       const f = tf.get(w) ?? 0
       if (!f) continue
-      s += (f / d.length) * Math.log(1 + N / (df.get(w) ?? 1))
-      if (tok(c.source).includes(w)) s += 0.5 // title boost
-      if (w.length > 4 && fold(c.text).includes(w)) s += 0.1 // exact-term boost
+      s += (f / len[i]) * Math.log(1 + N / (df.get(w) ?? 1))
+      if (titles[i].has(w)) s += 0.5 // title boost
+      if (w.length > 4 && folded[i].includes(w)) s += 0.1 // exact-term boost
     }
     const prev = best.get(c.parentId)
     if (s > 0 && (!prev || s > prev.score)) best.set(c.parentId, { chunk: c, score: s })

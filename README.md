@@ -8,7 +8,7 @@ that owns comments, admin login and the LLM call.
 | Piece | Lives where | How it changes |
 | --- | --- | --- |
 | Blog posts | `src/content/*.md`, committed to git | Bundled at build time. Add/edit/delete = commit, push, redeploy. |
-| Comments | Vercel Blob, one JSON object per comment | Via the backend. Anonymous; an open thread re-reads every few seconds. |
+| Comments | Vercel Blob, one JSON object per comment | Via the backend. Anonymous; a thread on screen re-checks every 5–30 s. |
 | Admin login | `ADMIN_PASSWORD` → signed session token | Session token in `sessionStorage`; the GitHub write credential stays server-side. |
 | RAG retrieval | Browser (`src/lib/rag.ts`) | TF-IDF + parent/child chunking, no vector DB. |
 | LLM call | Backend → OpenRouter | The key never ships to the browser. |
@@ -50,10 +50,25 @@ one browser.
 Anyone can comment; a name is optional and never verified. The owner can delete any
 comment inline in the thread. Reads are public, deletes require the admin token.
 
-Freshness is polling, not a stream: an open thread re-reads the comments every few
-seconds (`POLL_MS` in `src/components/Comments.tsx`). The backend runs serverless, so
-an in-process fan-out could not reach a comment written in another instance — a stream
-would go quietly stale instead of failing loudly.
+Freshness is polling, not a stream. The backend runs serverless, so an in-process
+fan-out could not reach a comment written in another instance, and a stream would go
+quietly stale instead of failing loudly.
+
+Polling is built to fit Blob's free tier. On Hobby, every `list` is an "advanced
+operation" (2,000 included a month), and going over blocks the store for 30 days. So:
+
+- Each thread has a version marker (`comment-versions/{slug}.json`) that every write
+  rewrites. A poll sends the last version it saw and costs one `head()` (a "simple"
+  operation, 10,000 included). The thread is only listed again when the version moved,
+  and the server keeps the last thread per instance, so a second reader often costs
+  just the `head()`.
+- The page polls only while the thread is on screen in a visible tab. It starts every
+  5 s and backs off to 30 s while nothing changes (`POLL_MIN_MS` / `POLL_MAX_MS` in
+  `src/components/Comments.tsx`). A reader who never scrolls to the comments costs one
+  load.
+
+The trade-off: on a quiet thread, someone else's new comment can take up to about 30 s
+to appear. Your own comments, reactions and deletes show instantly.
 
 Because writes are open, the backend rate-limits by IP (`COMMENTS_PER_WINDOW`) and
 caps length. If the thread ever gets targeted, add a captcha or moderation queue.
