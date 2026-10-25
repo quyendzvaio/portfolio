@@ -11,6 +11,13 @@ export interface Profile {
   phone: string
   gmail: string
   links: { label: string; url: string }[]
+  // Landing-page extras. Optional so an older profile.json still renders.
+  /** Status line in the hero badge; empty hides the badge. */
+  available?: string
+  /** Rotating words in the hero, orbit chips around the portrait, and the marquee. */
+  skills?: string[]
+  /** Up to four headline numbers; a leading number counts up on screen. */
+  stats?: { value: string; label: string }[]
 }
 
 export interface Post {
@@ -53,8 +60,13 @@ let cache: Chunk[] | null = null
 export function buildIndex(): Chunk[] {
   const chunks: Chunk[] = []
   const p = getProfile()
+  const extras = [
+    p.available ? `Availability: ${p.available}.` : '',
+    p.skills?.length ? `Skills: ${p.skills.join(', ')}.` : '',
+    p.stats?.length ? `Highlights: ${p.stats.map((s) => `${s.value} ${s.label}`).join('; ')}.` : '',
+  ].filter(Boolean).join(' ')
   chunks.push(...chunkParentChild('Profile', 'profile',
-    `${p.name} ${p.role} ${p.intro} Contact: LinkedIn ${p.linkedin}, phone ${p.phone}, email ${p.gmail}.`))
+    `${p.name} ${p.role} ${p.intro} ${extras} Contact: LinkedIn ${p.linkedin}, phone ${p.phone}, email ${p.gmail}.`))
   for (const post of getPosts()) {
     if (post.error) continue
     chunks.push(...chunkParentChild(post.meta.title, post.slug, `${post.meta.title}. ${post.meta.summary}. ${post.body}`))

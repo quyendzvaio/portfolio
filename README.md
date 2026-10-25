@@ -19,7 +19,24 @@ setup note and chat answers with raw retrieval plus citations.
 
 ## Customize (1 file)
 
-Edit `src/content/profile.json`: name, role, intro, avatar, linkedin, phone, gmail, links.
+Everything on the landing page comes from `src/content/profile.json`. Edit it by
+hand, or from `#/admin`, which commits the file for you.
+
+| Field | Shows up as |
+| --- | --- |
+| `name`, `role`, `intro` | Hero headline, role line, intro paragraph; also the browser tab title |
+| `avatar` | The 3D portrait. An `https://` URL, or a file in `public/` such as `avatar.webp` (the default) |
+| `available` | The status badge above your name. Empty hides it |
+| `skills` | The rotating word after your role, the first three as chips around the portrait, and the scrolling strip |
+| `stats` | Up to four highlight numbers (`{ "value": "3+", "label": "years shipping ML" }`). A leading number counts up |
+| `linkedin`, `phone`, `gmail`, `links` | Contact icons in the hero and footer |
+
+A section whose field is empty doesn't render. The chat also indexes these fields, so
+it can answer questions about your skills. To swap the photo without the admin panel,
+replace `public/avatar.webp` (a 4:5 crop of about 720×900 works best).
+
+Visitors can turn animations off from the footer. The site starts with motion off
+when the OS asks for reduced motion.
 
 ## Blog
 

@@ -40,6 +40,9 @@ export interface ProfilePayload {
   phone: string
   gmail: string
   links: { label: string; url: string }[]
+  available?: string
+  skills?: string[]
+  stats?: { value: string; label: string }[]
 }
 
 function requireBase(): string {

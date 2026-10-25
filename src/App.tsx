@@ -4,10 +4,13 @@ import { mdToHtml } from './lib/markdown'
 import ChatBox from './components/ChatBox'
 import Comments from './components/Comments'
 import SyncButton from './components/SyncButton'
-import Hero3D from './components/Hero3D'
+import Backdrop from './components/Backdrop'
+import Portrait from './components/Portrait'
+import { Marquee, PostCard, Rotator, Stat, delay } from './components/Landing'
 import ContactLinks from './components/Icons'
 import ProfileEditor from './components/ProfileEditor'
 import { apiConfigured, clearToken, getMe, loginAdmin, setToken } from './lib/api'
+import { setMotion, useMotion, useReveal } from './lib/motion'
 
 type Route = { page: string; slug?: string }
 
@@ -19,95 +22,142 @@ function parseHash(): Route {
 
 export default function App() {
   const [route, setRoute] = useState<Route>(parseHash)
+  const motion = useMotion()
   useEffect(() => {
-    const onChange = () => setRoute(parseHash())
+    const onChange = () => {
+      setRoute(parseHash())
+      window.scrollTo({ top: 0 })
+    }
     window.addEventListener('hashchange', onChange)
     return () => window.removeEventListener('hashchange', onChange)
   }, [])
   const profile = getProfile()
   const posts = getPosts()
+  useEffect(() => {
+    document.title = profile.role ? `${profile.name} — ${profile.role}` : profile.name
+  }, [profile.name, profile.role])
+
+  const nav = [
+    { page: 'home', href: '#/', label: 'Home' },
+    { page: 'blog', href: '#/blog', label: 'Blog' },
+    { page: 'chat', href: '#/chat', label: 'Ask AI' },
+    { page: 'admin', href: '#/admin', label: 'Admin' },
+  ]
 
   return (
-    <div className="app">
-      <nav className="nav">
-        <a href="#/" className="brand">{profile.name}</a>
-        <div className="links">
-          <a href="#/" className={route.page === 'home' ? 'active' : ''}>Home</a>
-          <a href="#/blog" className={route.page === 'blog' ? 'active' : ''}>Blog</a>
-          <a href="#/chat" className={route.page === 'chat' ? 'active' : ''}>Ask AI</a>
-          <a href="#/admin" className={route.page === 'admin' ? 'active' : ''}>Admin</a>
-        </div>
-      </nav>
+    <>
+      <Backdrop />
+      <div className="app">
+        <nav className="nav">
+          <a href="#/" className="brand"><span className="brand-dot" aria-hidden="true" />{profile.name}</a>
+          <div className="links">
+            {nav.map((item) => (
+              <a key={item.page} href={item.href} className={route.page === item.page ? 'active' : ''}>{item.label}</a>
+            ))}
+          </div>
+        </nav>
 
-      <main className="main">
-        {route.page === 'home' && <Home />}
-        {route.page === 'blog' && !route.slug && <BlogList />}
-        {route.page === 'blog' && route.slug && <Post slug={route.slug} />}
-        {route.page === 'chat' && (
-          <section className="card fade-in">
-            <h1>Ask about this portfolio</h1>
-            <p className="muted">Grounded in profile + {posts.length} blog post(s). Answers cite their sources.</p>
-            <ChatBox />
-          </section>
-        )}
-        {route.page === 'admin' && <Admin />}
-      </main>
+        <main className={`main ${route.page === 'home' ? '' : 'narrow'}`}>
+          {route.page === 'home' && <Home />}
+          {route.page === 'blog' && !route.slug && <BlogList />}
+          {route.page === 'blog' && route.slug && <Post slug={route.slug} />}
+          {route.page === 'chat' && (
+            <section className="card fade-in">
+              <h1>Ask about this portfolio</h1>
+              <p className="muted">Grounded in profile + {posts.length} blog post(s). Answers cite their sources.</p>
+              <ChatBox />
+            </section>
+          )}
+          {route.page === 'admin' && <Admin />}
+        </main>
 
-      <footer className="footer muted">
-        <ContactLinks profile={profile} />
-        <p className="small">{profile.name}</p>
-      </footer>
-    </div>
+        <footer className="footer muted">
+          <ContactLinks profile={profile} />
+          <p className="small">
+            © {new Date().getFullYear()} {profile.name} ·{' '}
+            <button className="link-btn" onClick={() => setMotion(!motion)} aria-pressed={motion}>
+              motion {motion ? 'on' : 'off'}
+            </button>
+          </p>
+        </footer>
+      </div>
+    </>
   )
 }
 
+// Everything on the landing page comes from src/content/profile.json (editable from
+// #/admin): sections whose data is missing simply do not render.
 function Home() {
   const p = getProfile()
-  const posts = getPosts().slice(0, 3)
+  const posts = getPosts().filter((post) => !post.error).slice(0, 3)
+  const skills = p.skills ?? []
+  const stats = (p.stats ?? []).slice(0, 4)
+  useReveal()
+
   return (
-    <>
-      <section className="hero card fade-in">
-        <Hero3D />
-        <div className="hero-body">
-          <img className="avatar" src={p.avatar} alt={`${p.name} avatar`} />
-          <div>
-            <h1>{p.name}</h1>
-            <p className="role">{p.role}</p>
-            <p>{p.intro}</p>
-            <ContactLinks profile={p} />
+    <div className="home">
+      <section className="hero">
+        <div className="hero-copy">
+          {p.available && (
+            <span className="eyebrow" data-reveal><span className="pulse" aria-hidden="true" />{p.available}</span>
+          )}
+          <h1 className="hero-name" data-reveal style={delay(80)}>{p.name}</h1>
+          <p className="hero-role" data-reveal style={delay(160)}>
+            {p.role}
+            {skills.length > 0 && <><span className="hero-sep" aria-hidden="true">/</span><Rotator words={skills} /></>}
+          </p>
+          <p className="hero-intro" data-reveal style={delay(240)}>{p.intro}</p>
+          <div className="hero-cta" data-reveal style={delay(320)}>
+            <a className="btn btn-neon" href="#/chat">Ask my AI <span aria-hidden="true">→</span></a>
+            <a className="btn btn-ghost" href="#/blog">Read the blog</a>
           </div>
+          <div data-reveal style={delay(400)}><ContactLinks profile={p} /></div>
         </div>
+        <Portrait src={p.avatar} name={p.name} chips={skills.slice(0, 3)} />
       </section>
-      <section className="fade-in">
-        <h2>Latest posts</h2>
-        <div className="grid">
-          {posts.map((post) => (
-            <a key={post.slug} className="card post-card" href={`#/blog/${post.slug}`}>
-              <h3>{post.meta.title}</h3>
-              <p className="muted small">{post.meta.date} · {post.meta.tags.join(', ')}</p>
-              <p>{post.meta.summary}</p>
-            </a>
-          ))}
-        </div>
+
+      {stats.length > 0 && (
+        <section className="stats">
+          {stats.map((stat, i) => <Stat key={stat.label} {...stat} wait={i * 110} />)}
+        </section>
+      )}
+
+      {skills.length > 0 && <Marquee items={skills} />}
+
+      {posts.length > 0 && (
+        <section className="latest">
+          <div className="section-head" data-reveal>
+            <div>
+              <p className="kicker">Writing</p>
+              <h2>Latest posts</h2>
+            </div>
+            <a href="#/blog">All posts →</a>
+          </div>
+          <div className="grid">
+            {posts.map((post, i) => <PostCard key={post.slug} post={post} wait={i * 110} />)}
+          </div>
+        </section>
+      )}
+
+      <section className="cta-band" data-reveal>
+        <p className="kicker">Ask, don't scroll</p>
+        <h2>Curious how I work?</h2>
+        <p className="muted">Ask the AI grounded in this site — every answer cites the post or profile it came from.</p>
+        <a className="btn btn-neon" href="#/chat">Start a conversation <span aria-hidden="true">→</span></a>
       </section>
-    </>
+    </div>
   )
 }
 
 function BlogList() {
   const posts = getPosts()
+  useReveal()
   return (
     <section className="fade-in">
+      <p className="kicker">Writing</p>
       <h1>Blog</h1>
       <div className="grid">
-        {posts.map((post) => (
-          <a key={post.slug} className="card post-card" href={`#/blog/${post.slug}`}>
-            <h3>{post.meta.title}</h3>
-            <p className="muted small">{post.meta.date} · {post.meta.tags.join(', ')}</p>
-            <p>{post.meta.summary}</p>
-            {post.error && <p className="warn">⚠ {post.error}</p>}
-          </a>
-        ))}
+        {posts.map((post, i) => <PostCard key={post.slug} post={post} wait={i * 80} />)}
       </div>
     </section>
   )

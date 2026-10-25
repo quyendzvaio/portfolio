@@ -6,6 +6,9 @@
 // URL that survived would be stored XSS on every page.
 
 export const MAX_LINKS = 12
+export const MAX_SKILLS = 16
+const MAX_SKILL_CHARS = 32
+export const MAX_STATS = 4
 
 /** Reaction picker vocabulary — also the allow-list for stored reaction maps. */
 export const REACTIONS = ['like', 'love', 'haha', 'wow', 'sad'] as const
@@ -36,6 +39,17 @@ function httpUrl(value: unknown, max: number): string {
   return /^https?:\/\//i.test(raw) ? raw : ''
 }
 
+/**
+ * http(s), or an image file bundled with the site (`avatar.webp` in public/). The
+ * relative form has no scheme, no `..` and no leading `//`, so it can only name a
+ * file next to the page.
+ */
+function imageSrc(value: unknown, max: number): string {
+  const raw = clean(value, max)
+  if (/^https?:\/\//i.test(raw)) return raw
+  return /^(\.\/)?[\w-]+(\/[\w-]+)*\.(png|jpe?g|webp|gif|avif|svg)$/i.test(raw) ? raw : ''
+}
+
 /** Link targets may also be mailto:/tel:. Everything else is dropped. */
 function linkUrl(value: unknown, max: number): string {
   const raw = clean(value, max)
@@ -63,11 +77,28 @@ export function sanitizeProfile(input: unknown): Record<string, unknown> {
 
   const gmail = clean(source.gmail, 200).replace(/\s/g, '')
 
+  const skills = (Array.isArray(source.skills) ? source.skills : [])
+    .map((skill) => clean(skill, MAX_SKILL_CHARS))
+    .filter(Boolean)
+    .slice(0, MAX_SKILLS)
+
+  const stats = (Array.isArray(source.stats) ? source.stats : [])
+    .flatMap((entry) => {
+      const stat = (entry ?? {}) as Record<string, unknown>
+      const value = clean(stat.value, 12)
+      const label = clean(stat.label, 40)
+      return value && label ? [{ value, label }] : []
+    })
+    .slice(0, MAX_STATS)
+
   return {
     name: clean(source.name, 80) || 'Your name',
     role: clean(source.role, 120),
     intro: clean(source.intro, 1000),
-    avatar: httpUrl(source.avatar, 500),
+    avatar: imageSrc(source.avatar, 500),
+    available: clean(source.available, 80),
+    skills,
+    stats,
     linkedin: httpUrl(source.linkedin, 300),
     // Kept as a bare value — the frontend builds the tel: link itself. Stripping the
     // letters can expose trailing space, so this trims again after the replace.

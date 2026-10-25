@@ -2,7 +2,14 @@
   "name": "Alex Nguyen",
   "role": "AI Engineer",
   "intro": "I build practical AI systems — RAG pipelines, LLM apps, and ML tooling. This site is my portfolio and a living AI knowledge base.",
-  "avatar": "https://avatars.githubusercontent.com/u/1?v=4",
+  "avatar": "avatar.webp",
+  "available": "Open to AI engineering roles",
+  "skills": ["RAG pipelines", "LLM apps", "Python", "TypeScript", "Vector search", "MLOps", "Prompt evaluation", "FastAPI"],
+  "stats": [
+    { "value": "3+", "label": "years shipping ML" },
+    { "value": "12", "label": "LLM apps in production" },
+    { "value": "40%", "label": "avg. latency cut" }
+  ],
   "linkedin": "https://www.linkedin.com/in/your-handle",
   "phone": "+84 900 000 000",
   "gmail": "you@example.com",

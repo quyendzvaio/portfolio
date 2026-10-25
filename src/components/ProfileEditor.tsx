@@ -111,8 +111,22 @@ export default function ProfileEditor() {
         <label>Name<input value={form.name} onChange={(e) => set('name', e.target.value)} /></label>
         <label>Role<input value={form.role} onChange={(e) => set('role', e.target.value)} /></label>
         <label>Intro<textarea rows={3} value={form.intro} onChange={(e) => set('intro', e.target.value)} /></label>
+        <label>
+          Availability badge
+          <input value={form.available ?? ''} onChange={(e) => set('available', e.target.value)} placeholder="Open to AI engineering roles (empty hides the badge)" />
+        </label>
+        <label>
+          Skills, comma-separated
+          {/* Split without trimming so typing "Vector search" keeps its space; the
+              server trims and drops empty entries on save. */}
+          <input
+            value={(form.skills ?? []).join(',')}
+            onChange={(e) => setForm((p) => ({ ...p, skills: e.target.value.split(',') }))}
+            placeholder="RAG pipelines, LLM apps, Python"
+          />
+        </label>
 
-        <label>Avatar URL<input value={form.avatar} onChange={(e) => set('avatar', e.target.value)} placeholder="https://…" /></label>
+        <label>Avatar URL<input value={form.avatar} onChange={(e) => set('avatar', e.target.value)} placeholder="https://… or avatar.webp (file in public/)" /></label>
         <div className="row">
           {form.avatar && <img className="avatar-preview" src={form.avatar} alt="avatar preview" />}
           <label className="btn">
@@ -132,6 +146,31 @@ export default function ProfileEditor() {
         <label>Phone<input value={form.phone} onChange={(e) => set('phone', e.target.value)} /></label>
         <label>Gmail<input value={form.gmail} onChange={(e) => set('gmail', e.target.value)} /></label>
       </div>
+
+      <h3>Highlight numbers (up to 4)</h3>
+      {(form.stats ?? []).map((stat, i) => (
+        <div key={i} className="row">
+          <input
+            value={stat.value}
+            placeholder="3+"
+            maxLength={12}
+            onChange={(e) => setForm((p) => ({ ...p, stats: (p.stats ?? []).map((x, j) => (j === i ? { ...x, value: e.target.value } : x)) }))}
+          />
+          <input
+            value={stat.label}
+            placeholder="years shipping ML"
+            maxLength={40}
+            onChange={(e) => setForm((p) => ({ ...p, stats: (p.stats ?? []).map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) }))}
+          />
+          <button onClick={() => setForm((p) => ({ ...p, stats: (p.stats ?? []).filter((_, j) => j !== i) }))}>Remove</button>
+        </div>
+      ))}
+      <button
+        disabled={(form.stats ?? []).length >= 4}
+        onClick={() => setForm((p) => ({ ...p, stats: [...(p.stats ?? []), { value: '', label: '' }] }))}
+      >
+        Add number
+      </button>
 
       <h3>Links (shown as icons)</h3>
       {form.links.map((link, i) => (
