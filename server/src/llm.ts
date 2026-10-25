@@ -34,6 +34,7 @@ export async function ask(query: string, context: ContextChunk[]): Promise<strin
         },
       ],
     }),
+    signal: AbortSignal.timeout(env.llm.timeoutMs),
   })
   if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${(await res.text()).slice(0, 200)}`)
   const data = (await res.json()) as { choices?: { message?: { content?: string } }[] }

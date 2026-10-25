@@ -12,7 +12,9 @@ export interface ParsedMd {
   error?: string
 }
 
-export function parseMd(raw: string): ParsedMd {
+export function parseMd(input: string): ParsedMd {
+  // A file saved with Windows line endings would otherwise fail the frontmatter match.
+  const raw = input.replace(/\r\n?/g, '\n')
   const m = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/)
   if (!m) {
     return {

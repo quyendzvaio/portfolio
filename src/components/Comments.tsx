@@ -116,12 +116,22 @@ export default function Comments({
   // Polling replaced the SSE stream. `load` already swaps in the whole thread, so a
   // comment created in another tab, edited by a reaction, or deleted by the owner
   // all land through the same path — no event-type handlers to keep in sync.
+  // A hidden tab skips its polls (each one is a Blob list + one read per comment) and
+  // catches up the moment it becomes visible again.
   useEffect(() => {
     if (!apiConfigured()) return
-    setLive(true)
-    const timer = setInterval(() => void load(), POLL_MS)
+    setLive(!document.hidden)
+    const timer = setInterval(() => {
+      if (!document.hidden) void load()
+    }, POLL_MS)
+    const onVisibility = () => {
+      setLive(!document.hidden)
+      if (!document.hidden) void load()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
     return () => {
       clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisibility)
       setLive(false)
     }
   }, [slug, load])

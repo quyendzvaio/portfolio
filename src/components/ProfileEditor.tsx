@@ -72,9 +72,17 @@ export default function ProfileEditor() {
     setStatus('')
     try {
       const result = await saveProfile(form)
-      setBaseline(form)
+      // Show what was committed, not what was typed: the server drops disallowed links
+      // and trims fields, and the form must not claim those survived.
+      const saved = { ...getProfile(), ...result.profile }
+      const cleaned = JSON.stringify(saved) !== JSON.stringify(form)
+      setForm(saved)
+      setBaseline(saved)
       setFromRepo(true)
-      setStatus(`Committed to ${result.path}. GitHub Actions redeploys in about a minute — the live site updates then.`)
+      setStatus(
+        `Committed to ${result.path}. GitHub Actions redeploys in about a minute — the live site updates then.` +
+          (cleaned ? ' Some values were cleaned up on save; the form now shows what was committed.' : ''),
+      )
     } catch (e) {
       setError((e as Error).message)
     } finally {

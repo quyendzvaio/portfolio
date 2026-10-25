@@ -55,6 +55,8 @@ export const env = {
     model: str('OPENROUTER_MODEL'),
     apiKey: str('OPENROUTER_API_KEY'),
     siteUrl: str('OPENROUTER_SITE_URL'),
+    // A hung provider would otherwise hold the request (and the visitor) open forever.
+    timeoutMs: num('OPENROUTER_TIMEOUT_MS', 30_000),
   },
 
   limits: {

@@ -19,7 +19,10 @@ export interface ScoredChunk {
   score: number
 }
 
-const tok = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/).filter((w) => w.length > 1)
+// Diacritics are folded away (nghiệm → nghiem, đ → d) on both sides, so Vietnamese
+// letters survive tokenizing and a query typed without accents still matches.
+const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase()
+const tok = (s: string) => fold(s).replace(/[^\p{L}\p{N}\s-]/gu, ' ').split(/\s+/).filter((w) => w.length > 1)
 
 const PARENT_MAX_WORDS = 300
 const CHILD_SIZE = 60
@@ -95,7 +98,7 @@ export function retrieve(query: string, chunks: Chunk[], k = 10): ScoredChunk[] 
       if (!f) continue
       s += (f / d.length) * Math.log(1 + N / (df.get(w) ?? 1))
       if (tok(c.source).includes(w)) s += 0.5 // title boost
-      if (w.length > 4 && c.text.toLowerCase().includes(w)) s += 0.1 // exact-term boost
+      if (w.length > 4 && fold(c.text).includes(w)) s += 0.1 // exact-term boost
     }
     const prev = best.get(c.parentId)
     if (s > 0 && (!prev || s > prev.score)) best.set(c.parentId, { chunk: c, score: s })
@@ -108,13 +111,15 @@ export function retrieve(query: string, chunks: Chunk[], k = 10): ScoredChunk[] 
 
 // Rerank: prefer parents covering more distinct query terms → top 3.
 export function rerank(query: string, hits: ScoredChunk[], top = 3): ScoredChunk[] {
-  const q = new Set(tok(query))
-  return [...hits]
-    .sort((a, b) => {
-      const ca = [...q].filter((w) => a.text.toLowerCase().includes(w)).length
-      const cb = [...q].filter((w) => b.text.toLowerCase().includes(w)).length
-      return cb - ca || b.score - a.score
-    })
+  const q = [...new Set(tok(query))]
+  const covered = (hit: ScoredChunk) => {
+    const text = fold(hit.text)
+    return q.filter((w) => text.includes(w)).length
+  }
+  return hits
+    .map((hit) => ({ hit, coverage: covered(hit) }))
+    .sort((a, b) => b.coverage - a.coverage || b.hit.score - a.hit.score)
+    .map(({ hit }) => hit)
     .slice(0, top)
 }
 

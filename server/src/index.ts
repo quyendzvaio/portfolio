@@ -124,18 +124,29 @@ async function requireAdmin(req: IncomingMessage): Promise<void> {
   if (!sessionFor(req)) throw new HttpError(403, 'Sign in at POST /api/login first.')
 }
 
-/**
- * The avatar version the committed profile.json points at: '' when its avatar is not
- * one of ours, null when the file could not be read (an upload then prunes nothing).
- */
-async function committedAvatarVersion(): Promise<string | null> {
+/** The avatar version a profile avatar URL points at; '' when it is not one of ours. */
+function avatarVersionOf(value: unknown): string {
   try {
-    const { content } = await readJsonFile(githubToken(), env.github.profilePath)
-    const avatar = new URL(String(content.avatar ?? ''), 'http://invalid')
+    const avatar = new URL(String(value ?? ''), 'http://invalid')
     return avatar.pathname === '/api/avatar' ? (avatar.searchParams.get('v') ?? '') : ''
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Deletes avatar objects nothing needs: everything but `keep` plus the version the
+ * committed profile.json points at. When that file cannot be read nothing is pruned,
+ * rather than risk deleting the live avatar. Best effort: a failed cleanup is logged
+ * and never fails the upload or save that triggered it.
+ */
+async function pruneAvatars(keep: string[], committedProfile?: Record<string, unknown>): Promise<void> {
+  if (!storageReady()) return
+  try {
+    const content = committedProfile ?? (await readJsonFile(githubToken(), env.github.profilePath)).content
+    await storage.pruneAvatars([...keep, avatarVersionOf(content.avatar)])
   } catch (error) {
-    console.warn('[server] could not read the committed avatar; skipping avatar cleanup:', error)
-    return null
+    console.warn('[server] avatar cleanup skipped:', error)
   }
 }
 
@@ -313,6 +324,10 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       'Update profile via admin',
       current.sha,
     )
+    // The committed avatar is now the only one anything points at, so the previous
+    // one (including a pre-versioning object) is deleted right away. Old URLs on the
+    // still-deployed bundle fall back to the newest version until the redeploy lands.
+    await pruneAvatars([], next)
     json(res, 200, { ok: true, path: env.github.profilePath, profile: next })
     return
   }
@@ -323,7 +338,10 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     const buffer = await readBody(req, env.limits.avatarMaxBytes)
     const image = sniffImage(buffer)
     if (!image) throw new HttpError(415, 'Avatar must be a PNG, JPEG, WebP or GIF image.')
-    const version = await storage.putAvatar(buffer, image.extension, await committedAvatarVersion())
+    // Written first, pruned second: a failed upload must not leave the site without
+    // an avatar. Earlier uploads that were never saved go now.
+    const version = await storage.putAvatar(buffer, image.extension)
+    await pruneAvatars([version])
     // The live site keeps its current avatar until a profile save commits this URL.
     json(res, 200, { url: `${publicOrigin(req)}/api/avatar?v=${version}` })
     return
@@ -368,7 +386,15 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         source: clean(chunk?.source, 200),
         text: clean(chunk?.text, MAX_CONTEXT_CHARS),
       }))
-    json(res, 200, { answer: await ask(query, context) })
+    const answer = await ask(query, context).catch((error: unknown) => {
+      // A provider timeout is an expected outcome: one log line, and the client
+      // falls back to raw retrieval.
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        throw new HttpError(504, `The model did not answer within ${Math.round(env.llm.timeoutMs / 1000)} s`)
+      }
+      throw error
+    })
+    json(res, 200, { answer })
     return
   }
 

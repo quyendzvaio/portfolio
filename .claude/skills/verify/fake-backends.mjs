@@ -77,6 +77,11 @@ gh.intercept({ path: (p) => p.includes('/contents/'), method: 'PUT' }).reply((op
   return { statusCode: 200, data: '{}', responseOptions: { headers: { 'content-type': 'application/json' } } }
 }).persist()
 
+// --- OpenRouter: FAKE_LLM_DELAY_MS delays the answer (to exercise OPENROUTER_TIMEOUT_MS)
+agent.get('https://openrouter.ai').intercept({ path: (p) => p.endsWith('/chat/completions'), method: 'POST' })
+  .reply(200, () => { log('llm answered'); return JSON.stringify({ choices: [{ message: { content: 'fake answer' } }] }) }, { headers: { 'content-type': 'application/json' } })
+  .delay(Math.max(1, Number(process.env.FAKE_LLM_DELAY_MS ?? 1))).persist()
+
 // Seed: one legacy avatar (pre-versioning layout), to check old URLs keep working.
 if (process.env.FAKE_LEGACY_AVATAR) {
   blobs.set('assets/avatar.png', { body: Buffer.from(process.env.FAKE_LEGACY_AVATAR), contentType: 'image/png', uploadedAt: new Date().toISOString() })

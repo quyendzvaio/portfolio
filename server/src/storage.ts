@@ -144,8 +144,9 @@ export async function updateComment(
 // bytes — which is what makes the immutable cache header on /api/avatar honest.
 const AVATAR_DIR = 'assets/avatars/'
 // Uploads from before versioning: a single object overwritten in place. GET falls
-// back to it so avatar URLs already committed keep working. The trailing dot keeps
-// the prefix from also matching 'assets/avatars/'.
+// back to it while the committed profile still points at it, and pruning deletes it
+// as soon as the committed profile points anywhere else. The trailing dot keeps the
+// prefix from also matching 'assets/avatars/'.
 const LEGACY_AVATAR_PREFIX = 'assets/avatar.'
 
 const VERSION_RE = /^[0-9]{1,20}$/
@@ -170,30 +171,40 @@ export interface StoredAvatar {
 
 const versionOf = (key: string): string => key.slice(AVATAR_DIR.length).split('.')[0]
 
-/**
- * Stores a new avatar version and returns it. `committed` is the version the
- * committed profile.json points at: it and the new one survive, every other
- * (uploaded but never saved) version is pruned. Null means the committed version is
- * unknown, so nothing is pruned rather than risk deleting the live avatar.
- */
-export async function putAvatar(buffer: Buffer, extension: string, committed: string | null): Promise<string> {
+/** Stores a new avatar version and returns it. Pruning is the caller's call (pruneAvatars). */
+export async function putAvatar(buffer: Buffer, extension: string): Promise<string> {
   const version = String(Date.now())
   const key = `${AVATAR_DIR}${version}.${extension}`
   await put(key, buffer, { ...blobOptions(), contentType: contentTypeFor(key) })
-  // Written first, pruned second: a failed upload must not leave the site with no avatar.
-  if (committed !== null) {
-    const stale = (await listKeys(AVATAR_DIR)).filter((k) => ![version, committed].includes(versionOf(k)))
-    await Promise.all(stale.map((k) => del(k, blobOptions())))
-  }
   return version
+}
+
+/**
+ * Deletes every avatar object except the versions in `keep`. The legacy object goes
+ * too, unless a kept version has no versioned object — that is a pre-versioning URL
+ * the committed profile still serves from the legacy object.
+ */
+export async function pruneAvatars(keep: string[]): Promise<void> {
+  const versioned = await listKeys(AVATAR_DIR)
+  const existing = new Set(versioned.map(versionOf))
+  const keepLegacy = keep.some((v) => v && !existing.has(v))
+  const stale = versioned.filter((k) => !keep.includes(versionOf(k)))
+  if (!keepLegacy) stale.push(...(await listKeys(LEGACY_AVATAR_PREFIX)))
+  await Promise.all(stale.map((k) => del(k, blobOptions())))
 }
 
 export async function getAvatar(version: string): Promise<StoredAvatar | null> {
   const [versioned] = validAvatarVersion(version) ? await listKeys(`${AVATAR_DIR}${version}.`) : []
-  const key = versioned ?? (await listKeys(LEGACY_AVATAR_PREFIX))[0]
+  // An unknown version is an old URL: the legacy object while it exists, else the
+  // newest version. That second case covers the minute between a profile save (which
+  // deletes the legacy object) and the redeploy that ships the new URL.
+  const key =
+    versioned ??
+    (await listKeys(LEGACY_AVATAR_PREFIX))[0] ??
+    (await listKeys(AVATAR_DIR)).sort((a, b) => Number(versionOf(b)) - Number(versionOf(a)))[0]
   if (!key) return null
-  // The legacy object is overwritten in place, so a CDN-cached read could return the
-  // previous picture. Versioned objects are never rewritten and can use the cache.
+  // The legacy object is overwritten in place and the fallback changes with every
+  // upload, so neither may come from a cache. An exact version never changes.
   const found = await get(key, { ...blobOptions(), useCache: Boolean(versioned) })
   if (!found) return null
   return {

@@ -33,6 +33,7 @@ FAKE_PROFILE='{"name":"T","avatar":"","links":[]}' PORT=18787 \
 ```
 
 - Each fake call is logged as `[fake] put|get|list|del|github ...`. Use that log to check write and delete order, and whether a read used `(cache=0)`.
+- `FAKE_LLM_DELAY_MS=5000` (with any `OPENROUTER_API_KEY`/`OPENROUTER_MODEL`) makes the fake model slow, to exercise `OPENROUTER_TIMEOUT_MS`.
 - `FAKE_LEGACY_AVATAR=<bytes>` seeds a pre-versioning `assets/avatar.png`. With `FAKE_GH_FAIL=1`, `kill -USR2 <pid>` makes GitHub reads return 502.
 - UI: start `VITE_API_BASE_URL=http://localhost:18787 npx vite --port 5199 --strictPort` with the server's `FRONTEND_ORIGIN=http://localhost:5199`. Then drive `google-chrome --headless=new --remote-debugging-port=9333` over CDP with Node's global `WebSocket`. Playwright isn't installed.
 - React's `onMouseEnter` (the reaction bar) needs a real `Input.dispatchMouseEvent` `mouseMoved`; a synthetic DOM event doesn't trigger it.
