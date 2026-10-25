@@ -1,0 +1,21 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+@AGENTS.md
+
+The import above holds commands, structure, env and conventions. Below are the cross-file flows that it doesn't spell out.
+
+## Request flows
+
+- **Chat (RAG):** retrieval happens entirely in the browser. `store.ts` `buildIndex()` chunks the bundled profile + posts (`rag.ts` `chunkParentChild`: ~300-word parents, 60-word children, 15 overlap) → `ChatBox.tsx` runs `rerank(retrieve(query, getIndex()))` → only the top chunks go to `POST /api/chat`. The server clamps that client-supplied context (`MAX_CONTEXT_CHUNKS`, `MAX_CONTEXT_CHARS` in `index.ts`) because the endpoint is public and bills OpenRouter. With no LLM configured, or if the call fails, the UI falls back to `fallbackAnswer()` (raw retrieval + citations). The index is rebuilt in memory; `localStorage` only stores sync metadata (`SyncButton`).
+- **Profile edit:** `ProfileEditor` → `PUT /api/profile` (admin) → server reads `profile.json` from GitHub, merges `sanitizeProfile(input)` over it, and commits it with the file's `sha` → GitHub Actions redeploys. The live site changes only after the rebuild, because `getProfile()` serves the copy bundled at build time.
+- **Avatar:** `PUT /api/profile/avatar` checks magic bytes (`sniffImage`) and stores the image in Blob (`assets/avatar.*`). The profile stores a `?v=`-stamped `/api/avatar` URL, which is cached as immutable, so a base64 image never ends up in a git diff. The URL origin comes from `publicOrigin(req)`, which is why `TRUST_PROXY` matters.
+- **Comments:** Blob layout is `comments/{slug}/{id}.json`, private access, and every read is proxied through the API. Reactions are read-modify-write, done with `useCache: false`. `parseComment` rebuilds each object field by field and skips malformed ones.
+
+## Backend patterns (`server/src/index.ts`)
+
+- One `handle()` function matches routes with `method` + `path` `if` checks. Throw `HttpError(status, msg)` for expected outcomes; the top-level catch turns it into `{error}` JSON. Any other throw is logged with its stack as a 500.
+- Guards: `requireAdmin(req)` (verifies the HMAC token from `auth.ts`), `requireStorage()`, and `llmReady()`. A missing config group should answer 503 instead of crashing.
+- Rate limiting is an in-memory `Map` per instance (`rateLimited(key, limit, windowMs)`, keyed by `clientIp`). On serverless it's best-effort only.
+- JSON bodies are capped at `MAX_JSON_BYTES` (16 KB); the avatar uses `env.limits.avatarMaxBytes`.

@@ -1,4 +1,4 @@
-# Portfolio — AI Blog + RAG Chat + MinIO Comments
+# Portfolio — AI Blog + RAG Chat + Comments
 
 Vite + React + TS static site (deploys to GitHub Pages) plus a small Node backend
 that owns comments, admin login and the LLM call.
@@ -126,7 +126,7 @@ then GitHub Actions redeploys. Expect a minute before the live site changes, and
 hard refresh if your browser cached the old avatar. The panel reads the committed
 file rather than the deployed bundle, so it never edits a stale copy.
 
-The avatar is uploaded to MinIO and referenced by URL instead of being inlined as a
+The avatar is uploaded to Vercel Blob (served through `/api/avatar`) and referenced by URL instead of being inlined as a
 base64 data URL — otherwise every later profile commit would carry a ~700 KB image
 in its diff.
 
@@ -166,8 +166,7 @@ docker compose up -d
 
 Deploying the API over HTTPS is still the right thing (the admin token travels in a
 header), and `TRUST_PROXY=1` is what makes the backend build correct avatar URLs.
-Expose MinIO's port 9000 only to the backend (it already is, inside the compose
-network) and put TLS in front of `8787`. The bundled Caddy service does that for you:
+Put TLS in front of `8787`. The bundled Caddy service does that for you:
 
 ```bash
 docker compose --profile tls up -d      # needs CADDY_DOMAIN + ports 80/443 open
@@ -178,7 +177,7 @@ sees real client IPs instead of the proxy's.
 
 ## Security notes
 
-- The OpenRouter key and MinIO credentials stay on the server. They used to be inlined
+- The OpenRouter key and Blob token stay on the server. They used to be inlined
   into the client bundle; that is fixed.
 - Comments are unauthenticated and stored in your own bucket. Rate limits are the only
   barrier — worth a captcha if it gets abused.
