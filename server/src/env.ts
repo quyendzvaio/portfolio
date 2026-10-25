@@ -46,7 +46,7 @@ export const env = {
     branch: str('GITHUB_BRANCH', 'main'),
     profilePath: str('PROFILE_PATH', 'src/content/profile.json'),
     // The commit credential moved server-side: the admin browser session only ever
-    // holds a random session token, so the PAT is out of XSS reach entirely.
+    // holds a signed session token, so the PAT is out of XSS reach entirely.
     token: str('GITHUB_TOKEN'),
   },
 

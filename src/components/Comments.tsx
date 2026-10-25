@@ -167,11 +167,11 @@ export default function Comments({
     if (!text || sending) return
     setSending(true)
     try {
-      // Replying to a reply stays in the same thread: the parent pointer always
-      // targets a top-level comment so nothing can end up orphaned. The quote
-      // carries the highlighted passage so readers see what the comment is about.
+      // parentId is the comment actually being answered: the server quotes it and
+      // re-points a reply-to-a-reply at the top-level comment so threads stay one
+      // level deep. The quote carries the highlighted passage, if any.
       const result = await createComment(slug, name.trim(), text, {
-        parentId: (replyTo?.parentId ?? replyTo?.id) || undefined,
+        parentId: replyTo?.id,
         quote: quoted?.text || undefined,
       })
       localStorage.setItem(NAME_KEY, name.trim())
@@ -206,20 +206,9 @@ export default function Comments({
 
   const react = async (comment: ApiComment, kind: ReactionKind) => {
     const current = comment.reactions?.[viewer] ?? []
+    // An empty list is sent too: it removes this viewer's entry on the server, so the
+    // next poll does not bring a just-removed reaction back.
     const next = current.includes(kind) ? current.filter((k) => k !== kind) : [...current, kind]
-    if (!next.length) {
-      // Toggling the only reaction off is a local-only change: the API keeps a
-      // non-empty allow-list, and an empty pick has nothing to store anyway.
-      setComments((all) =>
-        all.map((c) => {
-          if (c.id !== comment.id) return c
-          const reactions = { ...(c.reactions ?? {}) }
-          delete reactions[viewer]
-          return { ...c, reactions }
-        }),
-      )
-      return
-    }
     try {
       const result = await toggleReaction(slug, comment.id, viewer, next)
       setError('')

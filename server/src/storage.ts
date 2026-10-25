@@ -119,13 +119,14 @@ export const validViewer = (viewer: string): boolean => ID_RE.test(viewer)
 // Read-modify-write on one object: two concurrent reactors could lose one toggle.
 // At blog scale that is invisible; an ETag-guarded write would fix it if it ever
 // mattered (`list` returns an etag that `put`'s precondition could check).
+/** Null when the comment is gone (e.g. deleted while a reader had it open). */
 export async function updateComment(
   slug: string,
   id: string,
   mutate: (comment: Comment) => Comment,
-): Promise<Comment> {
+): Promise<Comment | null> {
   const existing = (await listComments(slug)).find((comment) => comment.id === id)
-  if (!existing) throw new Error(`comment ${id} not found`)
+  if (!existing) return null
   const next = mutate(existing)
   await putComment(next)
   return next
@@ -136,9 +137,19 @@ export async function updateComment(
 // The profile avatar lives in Blob rather than being inlined into profile.json as
 // a base64 data URL: that would put a ~700 KB blob in git, and every future edit to
 // the profile would carry it again in the diff.
-// The trailing dot matters: the prefix 'assets/avatar' alone would also match an
-// unrelated 'assets/avatar-copy.png' and delete it as stale.
-const AVATAR_PREFIX = 'assets/avatar.'
+//
+// Every upload is its own object, assets/avatars/{version}.{ext}, and the profile
+// stores /api/avatar?v={version}. An upload therefore changes nothing on the live
+// site until a profile save commits the new URL, and one URL always serves the same
+// bytes — which is what makes the immutable cache header on /api/avatar honest.
+const AVATAR_DIR = 'assets/avatars/'
+// Uploads from before versioning: a single object overwritten in place. GET falls
+// back to it so avatar URLs already committed keep working. The trailing dot keeps
+// the prefix from also matching 'assets/avatars/'.
+const LEGACY_AVATAR_PREFIX = 'assets/avatar.'
+
+const VERSION_RE = /^[0-9]{1,20}$/
+export const validAvatarVersion = (version: string): boolean => VERSION_RE.test(version)
 
 const AVATAR_TYPES: Record<string, string> = {
   png: 'image/png',
@@ -153,28 +164,41 @@ const contentTypeFor = (key: string): string =>
 export interface StoredAvatar {
   buffer: Buffer
   contentType: string
+  /** False for the legacy object, whose bytes change under the same pathname. */
+  immutable: boolean
 }
 
-/** Replaces the avatar, dropping any previous one so exactly one object ever exists. */
-export async function putAvatar(buffer: Buffer, extension: string): Promise<void> {
-  const keep = `${AVATAR_PREFIX}${extension}`
-  const stale = (await listKeys(AVATAR_PREFIX)).filter((key) => key !== keep)
-  await Promise.all(stale.map((key) => del(key, blobOptions())))
-  await put(keep, buffer, {
-    ...blobOptions(),
-    contentType: contentTypeFor(keep),
-    // Uploading the same format twice targets the same pathname.
-    allowOverwrite: true,
-  })
+const versionOf = (key: string): string => key.slice(AVATAR_DIR.length).split('.')[0]
+
+/**
+ * Stores a new avatar version and returns it. `committed` is the version the
+ * committed profile.json points at: it and the new one survive, every other
+ * (uploaded but never saved) version is pruned. Null means the committed version is
+ * unknown, so nothing is pruned rather than risk deleting the live avatar.
+ */
+export async function putAvatar(buffer: Buffer, extension: string, committed: string | null): Promise<string> {
+  const version = String(Date.now())
+  const key = `${AVATAR_DIR}${version}.${extension}`
+  await put(key, buffer, { ...blobOptions(), contentType: contentTypeFor(key) })
+  // Written first, pruned second: a failed upload must not leave the site with no avatar.
+  if (committed !== null) {
+    const stale = (await listKeys(AVATAR_DIR)).filter((k) => ![version, committed].includes(versionOf(k)))
+    await Promise.all(stale.map((k) => del(k, blobOptions())))
+  }
+  return version
 }
 
-export async function getAvatar(): Promise<StoredAvatar | null> {
-  const keys = await listKeys(AVATAR_PREFIX)
-  if (!keys.length) return null
-  const found = await get(keys[0], blobOptions())
+export async function getAvatar(version: string): Promise<StoredAvatar | null> {
+  const [versioned] = validAvatarVersion(version) ? await listKeys(`${AVATAR_DIR}${version}.`) : []
+  const key = versioned ?? (await listKeys(LEGACY_AVATAR_PREFIX))[0]
+  if (!key) return null
+  // The legacy object is overwritten in place, so a CDN-cached read could return the
+  // previous picture. Versioned objects are never rewritten and can use the cache.
+  const found = await get(key, { ...blobOptions(), useCache: Boolean(versioned) })
   if (!found) return null
   return {
     buffer: Buffer.from(await new Response(found.stream).arrayBuffer()),
-    contentType: contentTypeFor(keys[0]),
+    contentType: contentTypeFor(key),
+    immutable: Boolean(versioned),
   }
 }

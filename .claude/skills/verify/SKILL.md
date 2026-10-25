@@ -20,3 +20,19 @@ curl -s localhost:18787/api/health          # {ok, storage, admin, llm}
 - Rate limits are checked before Blob is used: with a dummy Blob token, `POST /api/comments/x/bad!id/reactions` returns 400, then 429 once `REACTIONS_PER_WINDOW` is used up. That path makes no network calls.
 - Compose parsing of an env file: copy `docker-compose.yml`, point `env_file` at the scratch file, then run `docker compose -f <copy> --project-directory . config`.
 - Don't drive `PUT /api/profile` with a real `GITHUB_TOKEN`: it commits to the repo.
+
+## Full flows without real Blob/GitHub
+
+`fake-backends.mjs` (next to this file) uses undici's `MockAgent` to replace Blob and the GitHub Contents API in memory, so comments, reactions, avatars and profile saves all run against the unmodified server:
+
+```bash
+# the token's 4th "_" field is the store id the fake answers for
+sed -i 's/^BLOB_READ_WRITE_TOKEN=.*/BLOB_READ_WRITE_TOKEN=vercel_blob_rw_dummyx_secret/' "$TMP/a.env"
+FAKE_PROFILE='{"name":"T","avatar":"","links":[]}' PORT=18787 \
+  node --env-file="$TMP/a.env" --import ./.claude/skills/verify/fake-backends.mjs server/dist/index.js
+```
+
+- Each fake call is logged as `[fake] put|get|list|del|github ...`. Use that log to check write and delete order, and whether a read used `(cache=0)`.
+- `FAKE_LEGACY_AVATAR=<bytes>` seeds a pre-versioning `assets/avatar.png`. With `FAKE_GH_FAIL=1`, `kill -USR2 <pid>` makes GitHub reads return 502.
+- UI: start `VITE_API_BASE_URL=http://localhost:18787 npx vite --port 5199 --strictPort` with the server's `FRONTEND_ORIGIN=http://localhost:5199`. Then drive `google-chrome --headless=new --remote-debugging-port=9333` over CDP with Node's global `WebSocket`. Playwright isn't installed.
+- React's `onMouseEnter` (the reaction bar) needs a real `Input.dispatchMouseEvent` `mouseMoved`; a synthetic DOM event doesn't trigger it.

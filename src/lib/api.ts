@@ -12,10 +12,9 @@ export const apiConfigured = (): boolean => rawBase.length > 0
 
 const TOKEN_KEY = 'portfolio.admin.token'
 
-// ponytail: the browser holds a random session token from POST /api/login, not the
+// ponytail: the browser holds a signed session token from POST /api/login, not the
 // GitHub credential. The PAT that commits profile.json lives in the server env, so
-// XSS on this page can at worst ride a session until it expires or the server
-// restarts — it can never read or rotate the write token. sessionStorage keeps the
+// XSS on this page can at worst ride a session until it expires — it can never read or rotate the write token. sessionStorage keeps the
 // session tab-scoped; switching to localStorage would only lengthen convenience.
 export const getToken = (): string => sessionStorage.getItem(TOKEN_KEY) ?? ''
 export const setToken = (token: string): void => sessionStorage.setItem(TOKEN_KEY, token)
@@ -109,7 +108,7 @@ export const deleteComment = (slug: string, id: string) =>
 
 // ----------------------------------------------------------------------- auth
 
-/** One admin password in, one random session token out. The PAT stays server-side. */
+/** One admin password in, one signed session token out. The PAT stays server-side. */
 export const loginAdmin = (password: string) =>
   request<{ token: string; login: string }>('/api/login', {
     method: 'POST',

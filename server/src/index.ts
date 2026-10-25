@@ -124,6 +124,21 @@ async function requireAdmin(req: IncomingMessage): Promise<void> {
   if (!sessionFor(req)) throw new HttpError(403, 'Sign in at POST /api/login first.')
 }
 
+/**
+ * The avatar version the committed profile.json points at: '' when its avatar is not
+ * one of ours, null when the file could not be read (an upload then prunes nothing).
+ */
+async function committedAvatarVersion(): Promise<string | null> {
+  try {
+    const { content } = await readJsonFile(githubToken(), env.github.profilePath)
+    const avatar = new URL(String(content.avatar ?? ''), 'http://invalid')
+    return avatar.pathname === '/api/avatar' ? (avatar.searchParams.get('v') ?? '') : ''
+  } catch (error) {
+    console.warn('[server] could not read the committed avatar; skipping avatar cleanup:', error)
+    return null
+  }
+}
+
 // --------------------------------------------------------------------- routing
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -155,7 +170,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return
   }
 
-  // One password in, one random session token out. Rate-limited because it is the
+  // One password in, one signed session token out. Rate-limited because it is the
   // only public endpoint that guards a secret.
   if (method === 'POST' && path === '/api/login') {
     if (!adminReady()) {
@@ -192,15 +207,23 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     if (!body) throw new HttpError(400, 'Comment cannot be empty')
     // Replies are first-class comments; only the parent linkage plus a short excerpt
     // of the parent are stored so the reply card can show what is being answered.
-    const parentId = clean(input.parentId, 64)
+    // parentId names the comment being answered, which may itself be a reply.
+    const answeredId = clean(input.parentId, 64)
+    let parentId = ''
     let quote = ''
-    if (parentId) {
-      if (!storage.validId(parentId)) throw new HttpError(400, 'Invalid parent comment id')
-      const parent = (await storage.listComments(slug)).find((c) => c.id === parentId)
-      if (!parent) throw new HttpError(404, 'The comment being replied to no longer exists')
-      // For replies the excerpt is derived server-side from the parent, so the
-      // reply card always quotes what is really being answered.
-      quote = parent.body.slice(0, 120)
+    if (answeredId) {
+      if (!storage.validId(answeredId)) throw new HttpError(400, 'Invalid parent comment id')
+      const thread = await storage.listComments(slug)
+      const answered = thread.find((c) => c.id === answeredId)
+      if (!answered) throw new HttpError(404, 'The comment being replied to no longer exists')
+      // For replies the excerpt is derived server-side from the answered comment, so
+      // the reply card always quotes what is really being answered.
+      quote = answered.body.slice(0, 120)
+      // Threads stay one level deep: a reply to a reply hangs off the same top-level
+      // comment. A reply whose own parent was deleted renders as top level, so it
+      // becomes the parent instead of pointing at a comment that no longer exists.
+      const root = answered.parentId && thread.some((c) => c.id === answered.parentId) ? answered.parentId : ''
+      parentId = root || answered.id
     } else {
       // Selection quotes come from the client (the highlighted passage is browser
       // state the server never sees). Same trust level as the body itself.
@@ -240,12 +263,18 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     const input = await readJson<{ viewer?: string; reactions?: unknown }>(req)
     const viewer = clean(input.viewer, 64)
     if (!storage.validViewer(viewer)) throw new HttpError(400, 'Invalid viewer id')
+    if (!Array.isArray(input.reactions)) throw new HttpError(400, 'reactions must be a list')
     const reactions = sanitizeReactions(input.reactions)
-    if (!reactions.length) throw new HttpError(400, 'No valid reaction supplied')
-    const updated = await storage.updateComment(slug, id, (comment) => ({
-      ...comment,
-      reactions: { ...comment.reactions, [viewer]: reactions },
-    }))
+    // An empty list is how a viewer takes back their last reaction. A non-empty list
+    // that sanitizes to nothing is a bad request, not a silent removal.
+    if (input.reactions.length && !reactions.length) throw new HttpError(400, 'No valid reaction supplied')
+    const updated = await storage.updateComment(slug, id, (comment) => {
+      const next = { ...comment.reactions }
+      if (reactions.length) next[viewer] = reactions
+      else delete next[viewer]
+      return { ...comment, reactions: next }
+    })
+    if (!updated) throw new HttpError(404, 'That comment no longer exists')
     json(res, 200, { comment: updated })
     return
   }
@@ -294,21 +323,22 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     const buffer = await readBody(req, env.limits.avatarMaxBytes)
     const image = sniffImage(buffer)
     if (!image) throw new HttpError(415, 'Avatar must be a PNG, JPEG, WebP or GIF image.')
-    await storage.putAvatar(buffer, image.extension)
-    // Date stamp so the browser refetches when the picture actually changes.
-    json(res, 200, { url: `${publicOrigin(req)}/api/avatar?v=${Date.now()}` })
+    const version = await storage.putAvatar(buffer, image.extension, await committedAvatarVersion())
+    // The live site keeps its current avatar until a profile save commits this URL.
+    json(res, 200, { url: `${publicOrigin(req)}/api/avatar?v=${version}` })
     return
   }
 
   if (path === '/api/avatar' && method === 'GET') {
     requireStorage()
-    const avatar = await storage.getAvatar()
+    const avatar = await storage.getAvatar(url.searchParams.get('v') ?? '')
     if (!avatar) throw new HttpError(404, 'No avatar uploaded yet')
     res.writeHead(200, {
       'Content-Type': avatar.contentType,
       'Content-Length': String(avatar.buffer.length),
-      // Safe to cache hard: the profile stores a ?v= stamped URL.
-      'Cache-Control': 'public, max-age=31536000, immutable',
+      // A versioned URL always serves the same bytes, so it can be cached hard. The
+      // legacy object can change, so browsers must revalidate it.
+      'Cache-Control': avatar.immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
     })
     res.end(avatar.buffer)
     return

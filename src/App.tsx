@@ -190,7 +190,7 @@ function Admin() {
         <h1>Admin</h1>
         <p className="muted">
           Sign in with the admin password (<code>ADMIN_PASSWORD</code> on the server). The server holds the GitHub
-          token itself, so the browser only ever carries a random session token.
+          token itself, so the browser only ever carries a signed session token.
         </p>
         <div className="row">
           <input
@@ -206,7 +206,7 @@ function Admin() {
         </div>
         {error && <p className="warn">⚠ {error}</p>}
         <p className="muted small">
-          The session lives in this tab only and expires when the server restarts or its TTL passes.
+          The session lives in this tab only and expires when its TTL passes or the server's session key changes.
         </p>
       </section>
     )

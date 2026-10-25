@@ -122,13 +122,15 @@ origin, which is the safest version of this.
 ## Editing the profile
 
 The admin panel commits `src/content/profile.json` to the branch you configured,
-then GitHub Actions redeploys. Expect a minute before the live site changes, and a
-hard refresh if your browser cached the old avatar. The panel reads the committed
-file rather than the deployed bundle, so it never edits a stale copy.
+then GitHub Actions redeploys. Expect a minute before the live site changes. The
+panel reads the committed file rather than the deployed bundle, so it never edits a
+stale copy.
 
-The avatar is uploaded to Vercel Blob (served through `/api/avatar`) and referenced by URL instead of being inlined as a
-base64 data URL — otherwise every later profile commit would carry a ~700 KB image
-in its diff.
+The avatar is uploaded to Vercel Blob (served through `/api/avatar?v=<version>`) and
+referenced by URL instead of being inlined as a base64 data URL — otherwise every
+later profile commit would carry a ~700 KB image in its diff. Each upload is a new
+version, so the live site keeps its current avatar until you save the profile, and an
+upload you never save is pruned by the next one.
 
 Every field is rebuilt server-side from an allow-list before it is committed, so only
 `http(s)`, `mailto:` and `tel:` links survive. A `javascript:` URL in `links` would
@@ -145,8 +147,13 @@ site builds with comments and admin disabled.
 static site at `/` and the container backend behind `/api/*`. Both deploy together on
 one domain, so the browser calls the API same-origin and CORS stops being a variable to
 get right. Set `VITE_API_BASE_URL=/` (same-origin), and add `BLOB_READ_WRITE_TOKEN`,
-`ADMIN_PASSWORD`, `GITHUB_REPO` and `GITHUB_TOKEN` as project env vars. The Dockerfile
-needs no changes: `env.ts` reads `PORT`, which is what the platform injects.
+`ADMIN_PASSWORD`, `GITHUB_REPO`, `GITHUB_TOKEN` and `TRUST_PROXY=1` as project env
+vars. The Dockerfile needs no changes: `env.ts` reads `PORT`, which is what the
+platform injects.
+
+`TRUST_PROXY=1` is safe here because Vercel overwrites `X-Forwarded-For` with the real
+client IP. Without it, every visitor shares one rate-limit bucket (the proxy's
+address), and avatar URLs come out as `http://`.
 
 Both services build from the same project root, which is the least-exercised part of
 this setup — if Vercel refuses two services from one root, fall back to a second Vercel
