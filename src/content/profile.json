@@ -1,10 +1,10 @@
 {
   "name": "Ninh Van Quyen",
   "role": "IT Student · Aspiring AI Engineer",
-  "intro": "I build practical AI systems — RAG pipelines, LLM apps, and ML tooling. This site is my portfolio and a living AI knowledge base.",
+  "intro": "IT student looking for an AI internship or junior AI Engineer role where I can keep learning and researching AI. I build reliable AI agents and RAG pipelines that cut manual work and deliver measurable business value.",
   "avatar": "avatar.webp",
-  "available": "Open to AI / ML internships",
-  "skills": ["RAG pipelines", "LLM apps", "Python", "TypeScript", "Vector search", "MLOps", "Prompt evaluation", "FastAPI"],
+  "available": "Open to AI internships & junior roles",
+  "skills": ["AI Agents", "RAG pipelines", "LLM apps", "Harness engineering", "Python", "TypeScript", "FastAPI", "Vector search", "Prompt evaluation", "MLOps", "CI/CD", "Docker"],
   "linkedin": "https://vn.linkedin.com/in/quyenninh",
   "phone": "+84 94 936 1319",
   "gmail": "nquyenworkspace@gmail.com",

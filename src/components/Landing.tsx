@@ -15,8 +15,12 @@ export function Rotator({ words }: { words: string[] }) {
     return () => clearInterval(timer)
   }, [motion, words.length])
   const word = words[index % words.length] ?? ''
+  // The rotator is as wide as its longest word, so the role line wraps the same way
+  // for every word instead of the hero jumping a line when a long one comes round.
+  const longest = words.reduce((a, b) => (b.length > a.length ? b : a), '')
   return (
     <span className="rotator" aria-live="polite">
+      <span className="rotator-sizer" aria-hidden="true">{longest}</span>
       {/* key remounts the span so the entry animation replays for each word */}
       <span key={word} className="rotator-word">{word}</span>
     </span>

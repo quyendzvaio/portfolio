@@ -169,6 +169,8 @@ button:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
 }
 .hero-sep { color: var(--pink); text-shadow: 0 0 12px var(--pink); }
 .rotator { display: inline-grid; overflow: hidden; }
+.rotator > * { grid-area: 1 / 1; white-space: nowrap; }
+.rotator-sizer { visibility: hidden; }
 .rotator-word {
   background: linear-gradient(90deg, var(--cyan), var(--violet)); -webkit-background-clip: text; background-clip: text; color: transparent;
   animation: word-in .6s var(--ease-out) both;
