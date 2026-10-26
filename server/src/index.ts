@@ -427,7 +427,9 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   throw new HttpError(404, 'Not found')
 }
 
-const server = createServer((req, res) => {
+// The whole app as one request listener: `main()` serves it with node:http (Docker,
+// `npm run dev:server`) and `api/[...path].js` hands it to Vercel as a function.
+export function listener(req: IncomingMessage, res: ServerResponse): void {
   handle(req, res).catch((error: unknown) => {
     if (res.headersSent) {
       res.end()
@@ -444,7 +446,7 @@ const server = createServer((req, res) => {
     console.error(`[server] ${req.method} ${req.url} →`, error)
     json(res, 500, { error: error instanceof Error ? error.message : 'Unexpected error' })
   })
-})
+}
 
 async function main(): Promise<void> {
   const report = configReport()
@@ -456,7 +458,8 @@ async function main(): Promise<void> {
   // No bucket to prepare any more: Blob needs a token, not a container, and a
   // missing token is already reported by the line above.
 
-  server.listen(env.port, () => console.log(`[server] listening on port ${env.port}`))
+  createServer(listener).listen(env.port, () => console.log(`[server] listening on port ${env.port}`))
 }
 
-void main()
+// Vercel sets VERCEL in its functions, which import `listener` and must not listen.
+if (!process.env.VERCEL) void main()

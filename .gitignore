@@ -6,3 +6,5 @@ server/dist/
 
 # CodeGraph index: local per-machine daemon state (db, sock, pid, log).
 .codegraph/
+.env.vercel
+.vercel/

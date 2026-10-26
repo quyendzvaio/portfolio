@@ -175,21 +175,22 @@ publishes it. Set a repository **variable** named `VITE_API_BASE_URL` (Settings 
 Secrets and variables → Actions → Variables) to your API URL; without it the deployed
 site builds with comments and admin disabled.
 
-**Frontend + backend → one Vercel project.** `vercel.json` declares two services: the
-static site at `/` and the container backend behind `/api/*`. Both deploy together on
-one domain, so the browser calls the API same-origin and CORS stops being a variable to
-get right. Set `VITE_API_BASE_URL=/` (same-origin), and add `BLOB_READ_WRITE_TOKEN`,
-`ADMIN_PASSWORD`, `GITHUB_REPO`, `GITHUB_TOKEN` and `TRUST_PROXY=1` as project env
-vars. The Dockerfile needs no changes: `env.ts` reads `PORT`, which is what the
-platform injects.
+**Backend → Vercel (serverless).** `vercel.json` builds only the backend
+(`npm run build:server`), and `api/[...path].js` serves every `/api/*` request with
+the same `listener` the Docker server uses. The frontend stays on GitHub Pages.
+1. Import the repo at vercel.com/new: preset *Other*, root `./`, no other build settings.
+2. Paste the env vars into the import form: `ADMIN_PASSWORD`, `GITHUB_REPO`,
+   `GITHUB_BRANCH`, `PROFILE_PATH`, `GITHUB_TOKEN`, `SESSION_SECRET`, `TRUST_PROXY=1`,
+   `FRONTEND_ORIGIN=https://<user>.github.io`, and the optional `OPENROUTER_*`.
+3. After the first deploy: Storage → create a **private** Blob store and connect it to
+   the project, which adds `BLOB_READ_WRITE_TOKEN`; then redeploy.
+4. Set the repo variable `VITE_API_BASE_URL` to the project URL and rerun the Pages
+   workflow. `https://<project>.vercel.app/api/health` should show `true` for each group.
 
 `TRUST_PROXY=1` is safe here because Vercel overwrites `X-Forwarded-For` with the real
 client IP. Without it, every visitor shares one rate-limit bucket (the proxy's
-address), and avatar URLs come out as `http://`.
-
-Both services build from the same project root, which is the least-exercised part of
-this setup — if Vercel refuses two services from one root, fall back to a second Vercel
-project for the backend and point `VITE_API_BASE_URL` at its URL instead.
+address), and avatar URLs come out as `http://`. On serverless, rate limits and the
+chat/thread caches are per instance, so treat them as best-effort.
 
 Storing comments in Vercel Blob (rather than the previous self-hosted MinIO) also
 retires a moving target: MinIO deprecated its community images, and its Docker Hub
