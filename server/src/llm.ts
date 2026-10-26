@@ -10,6 +10,7 @@ function systemPrompt(): string {
     'You answer questions about this portfolio and its blog posts.',
     'Use ONLY the Context below. Cite every factual claim as [source title].',
     'If the answer is not in the Context, say so and suggest what to ask instead.',
+    'Always answer in English, whatever language the question is in.',
   ].join(' ')
 }
 
