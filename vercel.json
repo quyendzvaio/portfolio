@@ -3,5 +3,8 @@
   "framework": null,
   "installCommand": "npm ci",
   "buildCommand": "npm run build:server",
-  "outputDirectory": "public"
+  "outputDirectory": "public",
+  "regions": [
+    "sin1"
+  ]
 }

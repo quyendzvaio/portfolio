@@ -8,3 +8,4 @@ server/dist/
 .codegraph/
 .env.vercel
 .vercel/
+.env.local

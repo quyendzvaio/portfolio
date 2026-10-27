@@ -178,12 +178,15 @@ site builds with comments and admin disabled.
 **Backend → Vercel (serverless).** `vercel.json` builds only the backend
 (`npm run build:server`), and `api/[...path].js` serves every `/api/*` request with
 the same `listener` the Docker server uses. The frontend stays on GitHub Pages.
+`regions: ["sin1"]` keeps the function in Singapore, next to the Blob store and the
+site's (Vietnamese) visitors; create the store in the same region.
 1. Import the repo at vercel.com/new: preset *Other*, root `./`, no other build settings.
 2. Paste the env vars into the import form: `ADMIN_PASSWORD`, `GITHUB_REPO`,
    `GITHUB_BRANCH`, `PROFILE_PATH`, `GITHUB_TOKEN`, `SESSION_SECRET`, `TRUST_PROXY=1`,
    `FRONTEND_ORIGIN=https://<user>.github.io`, and the optional `OPENROUTER_*`.
-3. After the first deploy: Storage → create a **private** Blob store and connect it to
-   the project, which adds `BLOB_READ_WRITE_TOKEN`; then redeploy.
+3. Create a **private** Blob store and connect it, which adds `BLOB_READ_WRITE_TOKEN`:
+   `vercel link`, then `vercel blob create-store <name> --access private --region sin1 --yes`
+   (or Storage → Create → Blob in the dashboard); then redeploy.
 4. Set the repo variable `VITE_API_BASE_URL` to the project URL and rerun the Pages
    workflow. `https://<project>.vercel.app/api/health` should show `true` for each group.
 
