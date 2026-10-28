@@ -7,10 +7,13 @@ summary: "Why LLMs struggle with ordinary APIs, how MCP fixes that, every compon
 
 # MCP: one protocol between agents and their tools
 
-In post 4, the customer-support agent for an online shop was built with LangGraph and had four
-tools: order lookup, refunds, CRM ticketing and email. That post said the tools "sit behind MCP
-servers" and moved on. This post opens that box: what MCP is, why it exists, what is inside,
-and what a real server looks like in Python.
+In [post 4](#/blog/langgraph-ai-agents) I built a customer-support agent with LangGraph: it
+picks its own next step, branches, and pauses for a human. But that agent is only as good as
+the tools in its hands: order lookup, refunds, CRM ticketing, email. And every tool is a
+different API that someone wires up by hand, separately for every application. Post 4 just
+said the tools "sit behind MCP servers" and moved on. This post opens that box: what MCP is,
+why it fixes exactly that weakness, what is inside, and what a real server looks like in
+Python.
 
 Every protocol detail here is checked against the current spec at
 [modelcontextprotocol.io](https://modelcontextprotocol.io/specification/latest), revision
@@ -79,26 +82,40 @@ and every editor can use it.
 
 ## 2. How MCP solves this
 
-MCP (Model Context Protocol) is an open protocol, built on JSON-RPC 2.0, that standardises how
-an AI application connects to sources of context and tools. It does not say which model you
-use or how you manage context; it only says which messages the two sides exchange.
+Put simply, MCP is a plug standard. Think of phone chargers: every brand used to have its own,
+and a new phone meant a new charger. Then USB-C arrived: any phone takes any charger, as long
+as both follow the one standard. MCP does the same job for AI. On one side is the AI
+application (an agent, a chatbot, an editor); on the other are tools and data (orders, the
+CRM, files). Instead of each pair running its own wire, both sides plug into one shared
+standard: a tool "speaks MCP" once and every application can use it, an application "speaks
+MCP" once and can call every tool.
+
+For the precise wording: MCP (Model Context Protocol) is an open protocol, built on JSON-RPC
+2.0 (a remote-call format in JSON), that standardises how an AI application connects to
+sources of context and tools. It does not say which model you use or how you manage context;
+it only says which messages the two sides exchange.
 
 ### 2.1 The components and what each one does
 
-The spec defines three participants:
+Picture your AI application as an office, and every outside system (the order warehouse, the
+CRM, email) as a supplier. The spec defines three participants:
 
-- **Host**: the AI application that contains the LLM and the agent loop. Claude Desktop, VS Code and our support agent are all hosts. The host decides which servers to connect to, asks the user when needed, and merges context from several sources for the model.
-- **Client**: an object the host creates, holding one connection to exactly one server. A host connected to four servers has four clients. The client handles the protocol work: attaching metadata to every request, routing messages, managing subscriptions.
-- **Server**: a program that provides context and capabilities to a client. It can be a process on the same machine or a remote service. It wraps the real system (the Orders DB, the CRM) and exposes only what the model needs.
+- **Host** is, plainly, the office: where the LLM "employee" sits and works, and where the boss (the agent loop) decides what may be done and what needs the user's say-so. Claude Desktop, VS Code and our support agent are all hosts. The host chooses which servers to connect to, asks the user when needed, and merges context from several sources for the model.
+- **Client** is a dedicated phone line from the office to exactly one supplier; four suppliers means four lines. Technically, the client is an object the host creates, holding one connection to exactly one server, and it does the protocol work: attaching metadata to every request, routing messages, managing subscriptions.
+- **Server** is the supplier's front desk: it stands in front of the real system (the Orders DB, the CRM) and hands out only what the visitor is allowed to see. It can be a process on the same machine or a remote service.
 
-A server offers three kinds of **primitive** (building block): **tools** (functions the model
-can call), **resources** (data to read, identified by a URI) and **prompts** (parameterised
-conversation templates). A client offers **elicitation** (the server asks the user for more
-input), plus two primitives marked deprecated in the 2026-07-28 revision, **sampling** and
-**roots**.
+Every front desk offers three things, which the spec calls **primitives** (building blocks).
+**Tools** are the menu: a list of jobs you can order, each with a name, a description and the
+details you have to fill in. **Resources** are the leaflets on the counter: read-only data such
+as the refund policy, each with its own address (a URI). **Prompts** are pre-printed forms: a
+piece of conversation with blanks to fill, such as "classify this ticket". In the other
+direction, the client offers **elicitation** (the desk asks the visitor for a missing detail),
+plus two primitives marked deprecated in the 2026-07-28 revision, **sampling** and **roots**.
 
-In between sits the **transport**, how bytes get from client to server: `stdio` for a server
-on the same machine, Streamable HTTP for a remote one.
+**Transport** is how the messages travel between office and desk: spoken face to face when
+they share a building (`stdio`, a server on the same machine) or over the network when they
+are far apart (Streamable HTTP). The content of the message is identical; only the route
+differs.
 
 ![MCP architecture: a host holding the LLM and three clients; each client connects to one server over stdio or Streamable HTTP; each server wraps a real system](blog/mcp-model-context-protocol-architecture.svg)
 
@@ -143,9 +160,8 @@ request and a `notifications/initialized` notification, where both sides negotia
 capabilities once. Revision 2026-07-28 removed that handshake: MCP became a **stateless**
 protocol, and each request carries the protocol version and client capabilities in its `_meta`
 field. `server/discover` took over the "what does this server have" role of `initialize`.
-Servers on 2025-11-25 and earlier still use the old handshake, and the official SDKs serve both
-kinds of client at once. This post follows the current revision and mentions the old one only
-where you are likely to meet it.
+This post follows the current revision and mentions the old one only where you are likely to
+meet it.
 
 ## 3. Each component in detail
 
@@ -724,7 +740,7 @@ server.
 
 ### 4.4 Plugging it into the LangGraph agent from post 4
 
-The agent from post 4 is the host. It needs one client per server, fetches the tool
+The agent from [post 4](#/blog/langgraph-ai-agents) is the host. It needs one client per server, fetches the tool
 definitions, converts them into LangChain tools, and forwards `tools/call` when the model picks
 one. LangChain 1.x ships that adapter in `langchain.mcp` (install `langchain[mcp]`, version
 1.4.0 or later; the API is in beta, and the old `langchain-mcp-adapters` package is archived):
@@ -741,7 +757,7 @@ async def build_agent(model):
         return create_agent(model, tools)       # host: agent loop + tool calling
 ```
 
-What MCP does *not* do for you is consent. In the post 4 graph, the node that calls the refund
+What MCP does *not* do for you is consent. In the [post 4](#/blog/langgraph-ai-agents) graph, the node that calls the refund
 tool has to pass through a "wait for human approval" node (a LangGraph interrupt) before
 `tools/call` is sent. The tool's `destructiveHint` is the signal that tells the host which
 tools need that node.
@@ -751,7 +767,7 @@ tools need that node.
 MCP adds a process (or a service), a serialisation layer, and over HTTP an OAuth flow. That is
 a real cost, and it is not always worth paying.
 
-- **One application, a handful of internal tools, one team.** Python functions attached directly to the agent are simpler, easier to debug and faster. Post 4 could run with no MCP at all.
+- **One application, a handful of internal tools, one team.** Python functions attached directly to the agent are simpler, easier to debug and faster. [Post 4](#/blog/langgraph-ai-agents) could run with no MCP at all.
 - **Tools that will never be reused.** The N x M saving only appears when N or M exceeds one.
 - **Hard latency budgets.** Each hop over stdio or HTTP adds milliseconds to tens of milliseconds; in an agent loop that calls twenty tools, that adds up.
 
@@ -773,8 +789,11 @@ large hosts, loading tools when needed rather than dumping all of them on every 
 - Security is not in the protocol but in the host: treat tool descriptions and results as untrusted, least privilege, a human approving destructive actions.
 - Python SDK 2.x: `MCPServer` for servers, `Client` for clients; type hints become schemas; `mcp dev` to try it.
 
-Post 6 is about the harness: everything around the LLM that lets it use tools reliably. MCP is
-one piece of that harness.
+The post 4 agent now has one standard socket for every tool. But a smart model with all the
+right tools in hand still drifts on long tasks: it forgets what it did, repeats mistakes, says
+"done" too early, does things it should not. What fixes that is not a smarter model but the
+environment built around it. [Post 6](#/blog/harness-engineering) starts there: harness
+engineering, and MCP is only one piece of that harness.
 
 References: [MCP specification 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28),
 [Key changes 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/changelog),

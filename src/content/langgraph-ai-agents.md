@@ -7,15 +7,15 @@ summary: "Where LangChain stops and LangGraph begins; what each LangGraph compon
 
 # LangGraph and AI Agents: From Looping Workflows to Multi-Branch Systems
 
-The previous post ended with a RAG pipeline written in LangChain: load documents, chunk, embed, retrieve, prompt, call the model. That pipeline runs one way, left to right, exactly once. This post is about what happens when you need more than that: go back a step, branch on a result, stop and wait for a human, then carry on the next day without losing anything. That is LangGraph's job. The second half of the post uses those same building blocks to design an AI agent for e-commerce customer support, with its tools wrapped in MCP.
+In [post 2](#/blog/langchain-rag-from-scratch) I built a RAG pipeline with LangChain, and in [post 3](#/blog/rag-production-techniques) I tuned it for production: hybrid search, a reranker, measurement with RAGAS. But even a well-tuned RAG is a one-way street: look up once, answer once. It cannot go back and try again when the result is poor, choose a different path depending on the question, take an action (look up an order, create a refund), or pause for a human. LangChain's chains run in a straight line. This post is about fixing exactly that weakness: LangGraph adds loops, branches, shared memory and pause points; on top of that, an AI agent lets the model decide the next step itself. The second half of the post uses those same building blocks to design a customer-support agent for an e-commerce marketplace, with its tools wrapped in MCP.
 
 Versions used here: LangGraph 1.2.x and LangChain 1.4.x (Python), checked against the official docs at the time of writing. The LangGraph API has been stable since 1.0; the MCP integration inside LangChain is still in beta, and I say so where it matters.
 
 ## 1. Where LangChain stops and LangGraph begins
 
-LangChain gives you the pieces: models, prompts, parsers, retrievers, tools. Its default way to connect them is a *chain*: the output of one piece is the input of the next. Structurally, a chain is a directed acyclic graph (DAG): data flows one way and never turns back.
+Put simply: a LangChain chain is like an assembly line. Raw material goes in at one end, passes each station, and a product comes out the other end. The line only runs forward. It does not go back to an earlier station when it spots a defect. It does not switch to a different line depending on the material. It does not stop and wait for the supervisor to sign off. And if the power fails halfway, it does not remember where it was. For "read, then answer" jobs the assembly line is enough. But real work usually has a different shape: try again, branch, wait for a person, stop halfway and continue later.
 
-A lot of real work does not have that shape. Here is a plain list of what a pure chain cannot do, or does only awkwardly:
+In technical terms: LangChain gives you the pieces (models, prompts, parsers, retrievers, tools), and its default way to connect them is a *chain*, where the output of one piece is the input of the next. A chain is a directed acyclic graph (DAG): data flows one way and never turns back. Here is a plain list of what a pure chain cannot do, or does only awkwardly:
 
 - **Loops.** "Retrieve; if the result is not good enough, rewrite the query and retrieve again" is a loop. A chain has no backward edge.
 - **Branching on state.** The next step depends on the result of the previous one (is this question about an order or about a policy?). You can write `if` statements, but with five branches of three steps each the code becomes a nested tree where nobody can see the flow any more.
@@ -27,7 +27,9 @@ A lot of real work does not have that shape. Here is a plain list of what a pure
 
 LangGraph exists to do exactly these things. Its documentation calls it a "low-level orchestration framework and runtime" for stateful, long-running agents, and states that you do not need LangChain to use it (in practice the two almost always travel together: LangChain supplies models, tools and messages; LangGraph supplies the way to orchestrate them). The higher-level `create_agent` in LangChain 1.x is itself built on LangGraph.
 
-How LangGraph solves the problems above, in one sentence: **you describe the process as an explicit state machine, a graph of nodes operating on one shared state, cycles allowed, and the runtime saves that state after every step (a checkpoint).**
+How does LangGraph fix this? Picture it like this. Instead of an assembly line, you draw a flowchart that works like a board game. The squares are where work gets done. The arrows say "after this square, go to that one", and an arrow is allowed to point back to an earlier square. Every square writes in the same shared notebook: the next square opens the notebook and sees what the previous ones did. And after every square the game saves itself, like a video game saving your progress: switch the machine off, come back tomorrow, continue from exactly that spot. Those four things are all you need for loops (arrows pointing back), branches (arrows with a condition), shared memory (the notebook) and pause-and-resume (the save point).
+
+In technical terms, in one sentence: **you describe the process as an explicit state machine, a graph of nodes operating on one shared state, cycles allowed, and the runtime saves that state after every step (a checkpoint).**
 
 The three ideas in that sentence map onto the three groups of problems:
 
@@ -42,6 +44,8 @@ The rest is just going through the pieces.
 People new to LangGraph usually get lost not because the ideas are hard but because the docs name many things at once. Below I follow the order you meet them when writing a real graph, and for each component answer two questions: what does it *contain*, and what is it *for*.
 
 ### State: the shared whiteboard every node writes on
+
+Put simply: the state is the shared notebook of the whole process. The notebook has fixed sections (what the question is, what has been found, how many attempts so far). Whoever finishes a job writes into their section; the next person opens the notebook and reads. Nobody keeps a private notebook; there is only one. By default a new entry replaces the old one, but for some sections (like the conversation history) you say up front: "this section is append-only, never erase".
 
 **Contains:** a schema, usually a `TypedDict`, listing the fields the process needs to track. For example: the original question, the current search query, the chunks found so far, how many attempts have been made.
 
@@ -76,6 +80,8 @@ One point about what state fundamentally is: *state is not the LLM's memory*. It
 
 ### Node: one unit of work
 
+Put simply: a node is one person doing one job. They open the notebook, read what they need, do their job (look up documents, ask the model, call an outside service), and write the result into the notebook. That is all. They do not call anyone else; who goes next is not their concern.
+
 **Contains:** a Python function (sync or `async`) that takes the current state and returns a dict with the fields to update. Inside it can be anything: an LLM call, a retriever, an API call, or a plain `if`.
 
 **For:** being the smallest unit the runtime executes, checkpoints and streams. So node boundaries should match "the points where you want to observe or resume". A node that calls an LLM, then an API, then writes to a database is too big: if the DB write fails, resuming reruns the LLM too.
@@ -89,6 +95,8 @@ def retrieve(state: State) -> dict:
 Register it with `builder.add_node("retrieve", retrieve)`. If you omit the name, LangGraph uses the function name.
 
 ### Edges: who runs after whom
+
+Put simply: an edge is an arrow on the chart, answering "after this job, which job comes next". There are two kinds. A fixed arrow: after A, always B. A conditional arrow: a gatekeeper stands there, opens the notebook, and points the way, "if the result is good go to the answer, if not go back and search again". The gatekeeper does nothing except point. This kind of arrow is what creates branches and loops.
 
 **Contains:** two kinds. A normal edge is a pair of node names: when A finishes, run B. A conditional edge is a *routing function*: it receives the state and returns the name of the next node.
 
@@ -115,9 +123,13 @@ A routing function should only read state and return a node name. Do not call an
 
 ### START and END: the two anchors
 
+Put simply: START is the entrance door and END is the exit door of the chart. Nobody works at a door. They exist only so you can draw the arrows "begin at this square" and "after that square, leave".
+
 `START` is a virtual node standing for "the caller's input"; `END` is "return the result". They run nothing. They exist so you can draw an edge from the input to the first node and from the last node out, exactly like any other edge. A graph may have many paths to `END`.
 
 ### StateGraph and compile(): the blueprint and the machine
+
+Put simply: StateGraph is the drawing on paper; you add squares and arrows to it. compile is when the drawing is checked (is there a square no arrow leads to, an arrow pointing at a square that does not exist) and then built into a machine that can run. Building the machine is also when you plug in extras: where the notebook is stored, where to pause.
 
 `StateGraph(State)` is the *builder*: you add nodes and edges to it. It cannot run. `builder.compile()` validates the graph (unreachable nodes, edges pointing at names that do not exist) and returns a runnable graph with the familiar LangChain interface: `invoke`, `stream`, `ainvoke`, `astream`.
 
@@ -126,6 +138,8 @@ Everything "infrastructural" is plugged in at compile time: `compile(checkpointe
 Two safety nets worth knowing: `GraphRecursionError` is raised when a graph exceeds `recursion_limit` steps (set in the `config` you pass to invoke), so a mis-wired loop cannot run forever; and the `Literal[...]` return annotation on routing functions lets LangGraph draw the graph and catch bad node names early.
 
 ### Checkpointer and thread_id: state that outlives a call
+
+Put simply: the checkpointer is the save-game feature. After every square it photographs the notebook and files the photo away. The thread_id is the name of the save file: one per conversation. Open the same file name and you continue exactly where you were, conversation history and lookups included. Open a different name and it is a new game with a blank notebook.
 
 **Contains:** a storage backend (RAM, SQLite, Postgres) and, per *thread*, a sequence of *checkpoints*: snapshots of the state after each step.
 
@@ -147,6 +161,8 @@ graph.invoke(ask("And the other one?"), config)   # same thread_id: remembers
 The persistence docs also distinguish the *checkpointer* (short-term memory, per thread) from the *store* (long-term memory shared across threads, key-value style, for things like customer preferences). A store is plugged in with `compile(store=InMemoryStore())`. This post only uses the checkpointer.
 
 ### interrupt(): pause for a human, then continue
+
+Put simply: interrupt is a pause button placed inside a square, with a note handed outside: "this needs a person's approval, here are the details". The machine stops, saves the game, and gives you the note. When the decision arrives, you hand it in, the machine opens the save file and continues from that square. Seconds later or the next morning, it makes no difference.
 
 **Contains:** a function you call inside a node. `interrupt(payload)` stops the graph right there, saves a checkpoint, and hands `payload` back to the caller under the key `__interrupt__`. When you call the graph again with `Command(resume=value)` on the same `thread_id`, the node runs again and this time `interrupt()` returns `value`.
 
@@ -174,15 +190,21 @@ One detail the docs stress and that is worth remembering: on resume, **the node 
 
 ### Command and Send: two advanced ways to branch
 
+Put simply: Command is when the worker writes in the notebook and points the way at the same time, with no separate gatekeeper. Send is when one job has to be split among several people working at once, each on their own piece, with the results gathered afterwards, and how many people is only known at run time.
+
 `Command` lets a node update state and name the next node in one return value: `return Command(update={"intent": "refund"}, goto="refund_check")`. It merges "node plus conditional edge" into one, which is handy when the routing decision depends on what the node just computed. I still prefer separate routing functions because the edge list reads better, but `Command` is the right tool when a node inside a subgraph needs to jump to a node of the parent graph (`graph=Command.PARENT`).
 
 `Send` is for map-reduce: a routing function returns a list of `Send("worker", {"item": x})`, each one starting a copy of `worker` with its own state, in parallel, and the results are merged through a reducer. Use it when the number of branches is only known at run time (split a document into N parts, summarise each).
 
 ### Subgraphs: a graph inside a graph
 
+Put simply: a subgraph is a smaller chart folded up into one square of the big chart. From outside it is one square; open it and there is a whole process inside. Like a department in a company: you hand the department a task, and how they divide it among themselves is their business.
+
 A compiled graph can be a node of another graph. If both graphs share field names in their state, you `add_node("branch", subgraph)` directly; if the schemas differ, you write a wrapper node that turns the parent state into the child's input, calls `subgraph.invoke`, and maps the result back. Use it to package a complex branch (the whole refund flow) as a reusable, separately testable unit. A note from the docs: the parent graph must be compiled with a checkpointer for interrupts inside the subgraph to work.
 
 ### Streaming: watching the graph run
+
+Put simply: streaming is watching the machine run in real time instead of waiting for the final result. You pick what to watch: which square just finished and what it wrote in the notebook, or every word the model is typing. For the user it is the difference between a blank screen for ten seconds and a line that says "looking up your order".
 
 `graph.stream(inputs, stream_mode=...)` yields pieces as the graph runs. The modes you will actually use: `updates` (what each node just returned), `values` (the full state after each step), `messages` (each LLM token as it is generated, with metadata), `custom` (data you emit yourself from inside a node). Pass a list to receive several modes at once. For a chat UI you want `messages`; for debugging, `updates` shows you the exact node order and the part of the state each node changed.
 
@@ -305,7 +327,7 @@ This is the part worth reading slowly, because it shows what "a graph over share
 
 Notice three things. `question` never changes and `query` changes once; both live in the state, so the `answer` node can use the original question even though retrieve ran with the rewritten one. `attempts` is incremented in `retrieve`, not in `rewrite`, so the first retrieve counts too. And the routing function never calls a model: it only reads two fields the `grade` node wrote.
 
-When you do *not* need this: if your retriever is good (hybrid search and a reranker, as discussed in post 3) and users ask clear questions, a grade/rewrite loop adds two LLM calls per question to rescue a small fraction of them. Measure how often grade returns False before you decide to keep it. A good system is the simplest one that clears the quality bar.
+When you do *not* need this: if your retriever is good (hybrid search and a reranker, as discussed in [post 3](#/blog/rag-production-techniques)) and users ask clear questions, a grade/rewrite loop adds two LLM calls per question to rescue a small fraction of them. Measure how often grade returns False before you decide to keep it. A good system is the simplest one that clears the quality bar.
 
 ## 4. What an AI agent is, and what it solves
 
@@ -321,6 +343,8 @@ A RAG chatbot, even one with a loop like the above, has a few built-in limits:
 
 ### What makes a system an "AI agent"
 
+Put simply: in a workflow, a person (the programmer) drew the path on the chart in advance: after this job, that job; every situation was thought out beforehand. In an agent, the path is not drawn. You give the model a goal and a toolbox, and the model finds its own way: look at the situation, think about what to do, pick a tool and use it, look at the result, think again. It keeps going until it judges the job done, or until it runs out of allowed turns. It is like briefing a new employee: a workflow hands them a step-by-step checklist; an agent tells them the goal, shows them the tools in the office, and lets them get on with it. What makes an agent is not having a model or having tools, but *who decides the next step*: a person in advance, or the model on the spot.
+
 Anthropic's post "Building effective agents" draws the distinction I find cleanest. It groups everything under *agentic systems*, then separates two architectures:
 
 - **Workflows:** LLMs and tools are orchestrated through *predefined code paths*.
@@ -328,7 +352,7 @@ Anthropic's post "Building effective agents" draws the distinction I find cleane
 
 And the bluntest line in the post: in practice, agents are "typically just LLMs using tools based on environmental feedback in a loop".
 
-So what makes a system an agent is not having an LLM, nor having tools, but **who decides the next step**. In the Q&A case of section 3, code decides (the `route_after_grade` function): that is a workflow. Replace it with an LLM that is given the list of tools (retrieve, rewrite, answer) and chooses what to call next, looping until it decides it is done: that is an agent.
+So, restated in technical terms: what makes a system an agent is **who decides the next step**. In the Q&A case of section 3, code decides (the `route_after_grade` function): that is a workflow. Replace it with an LLM that is given the list of tools (retrieve, rewrite, answer) and chooses what to call next, looping until it decides it is done: that is an agent.
 
 The agent loop looks like this: *observe* (read the request, the state, the tool result that just came back), *reason* (choose the next action), *act* (call a tool), then observe the result again. Around it sit *memory* (the conversation history and the results of previous steps) and a *stopping condition* (goal reached, or a maximum number of steps). In LangGraph that loop is two nodes and one conditional edge: a node that calls the model, a node that runs tools, and a routing function asking "does the last message contain `tool_calls`?".
 
@@ -350,14 +374,14 @@ Internal systems: the order database, the refund API, the CRM ticketing system, 
 
 ### MCP in one short section
 
-MCP (Model Context Protocol) is an open protocol for AI applications to talk to external data sources and tools in one standard way. Post 5 goes deep; here is just enough vocabulary:
+MCP (Model Context Protocol) is an open protocol for AI applications to talk to external data sources and tools in one standard way. [Post 5](#/blog/mcp-model-context-protocol) goes deep; here is just enough vocabulary:
 
 - The **MCP host** is the AI application (here, our agent app). The host creates **MCP clients**, each holding one connection to one **MCP server**. Four servers, four clients.
 - A server exposes **tools**, each with a `name`, a `description` and an `inputSchema` (a JSON Schema describing the parameters).
 - A client discovers tools with a `tools/list` request and invokes one with `tools/call`, passing `name` and `arguments`. The result is a `content` array (usually text) plus an `isError` flag.
 - Messages are JSON-RPC 2.0, carried over stdio (the server runs locally as a child process) or streamable HTTP (the server runs remotely).
 
-The current spec revision is 2026-07-28 (a stateless protocol, with server discovery through `server/discover`); the tools primitive, including `tools/list` and `tools/call`, is unchanged from the 2025-06-18 revision linked at the end of this post. Post 5 covers those differences.
+The current spec revision is 2026-07-28 (a stateless protocol, with server discovery through `server/discover`); the tools primitive, including `tools/list` and `tools/call`, is unchanged from the 2025-06-18 revision linked at the end of this post. [Post 5](#/blog/mcp-model-context-protocol) covers those differences.
 
 One tool on the orders server looks like this in a `tools/list` response:
 
@@ -666,7 +690,9 @@ support-agent/
 
 After reading an architecture with many boxes, the natural reflex is to build all the boxes. Resist it. If 90 percent of messages are policy questions, a RAG chain with a graceful refusal for the rest is enough, and it is cheaper, faster and easier to debug. Add the `router` when you genuinely have a second branch that needs to act. Add `interrupt()` when there is an action that costs money if wrong. Add an agent branch (the model choosing tools) when the number of steps truly cannot be predicted. And measure every addition with the eval set, not by feel.
 
-LangGraph does not make a system smarter. It makes the control flow **explicit, saved and resumable**. Those are the three things you need once an LLM system is allowed to act instead of merely answer. The next post goes deep into MCP: why traditional APIs are hard for LLMs, and what each part of the protocol does.
+LangGraph does not make a system smarter. It makes the control flow **explicit, saved and resumable**. Those are the three things you need once an LLM system is allowed to act instead of merely answer.
+
+But an agent is only as useful as the tools in its hands, and that is the weakness this post has not dealt with. Above, I assumed the four internal systems were already sitting behind MCP servers. In practice they usually are not: every tool is a different API, every app writes its own glue for every tool, and N apps times M tools means N times M hand-wired connections. [Post 5](#/blog/mcp-model-context-protocol) starts exactly there: MCP as one standard plug between agents and tools, and what each part of it does.
 
 ## Sources
 

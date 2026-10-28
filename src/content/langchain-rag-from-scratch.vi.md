@@ -7,9 +7,12 @@ summary: "LangChain sinh ra để giải quyết vấn đề gì, từng compone
 
 # LangChain là gì, và build RAG from scratch với LangChain
 
-Bài 1 của series đã nói vì sao LLM cần RAG: model chỉ biết những gì nó được train, nên ta
-retrieve (tìm) đoạn tài liệu liên quan rồi nhét vào context để model trả lời có căn cứ. Bài này
-trả lời câu hỏi tiếp theo: *viết cái đó bằng gì?* Phần đầu giải thích LangChain ra đời để giải
+Ở [bài 1](#/blog/rag-fundamentals) mình đã thấy RAG giải quyết chuyện LLM không biết dữ liệu
+của bạn: tìm đúng đoạn tài liệu, đưa vào context, model trả lời có căn cứ. Ý tưởng thì đơn
+giản. Nhưng khi bắt tay vào làm thật, bạn sẽ thấy RAG không phải một thứ mà là năm sáu thứ
+rời rạc phải dán lại với nhau: đọc file, cắt nhỏ, embedding, vector store, rồi LLM. Mỗi hãng
+lại có cách làm riêng cho từng mảnh, nên đổi một mảnh là phải viết lại phần dán. Bài này nói
+về công cụ sinh ra để sửa đúng điểm yếu đó: LangChain. Phần đầu giải thích LangChain giải
 quyết vấn đề gì và từng component của nó dùng ở đâu trong RAG, ở đâu trong Agent. Phần sau
 build một hệ RAG nhỏ, chạy được trên máy, với cấu trúc thư mục mà nhìn qua là thấy pipeline.
 
@@ -21,12 +24,20 @@ PyPI): `langchain` 1.4.7, `langchain-core` 1.7.1, `langgraph` 1.2.18,
 
 ## 1. LangChain sinh ra để giải quyết vấn đề gì
 
-Hãy hình dung bạn tự viết RAG không dùng framework. Bạn cần: gọi API của một nhà cung cấp
-model (OpenAI, Anthropic, Google, hay Ollama chạy local), mỗi hãng một format request và
-response khác nhau; đọc file PDF, Markdown, HTML; cắt text thành đoạn; gọi một API embedding
-khác; lưu vector vào một database; viết hàm tìm kiếm; ghép prompt; parse kết quả. Chừng đó
-việc là chừng đó đoạn glue code. Rồi một ngày bạn muốn đổi từ GPT sang Claude để so sánh, hay
-đổi vector store từ Chroma sang Postgres, và nhận ra glue code dính chặt vào hãng cũ.
+Nói nôm na là thế này. Hình dung bạn mua đồ điện ở năm nước khác nhau, mỗi cái một kiểu phích
+cắm. Muốn dùng được thì bạn phải tự chế một cục chuyển đổi cho từng cái, và hôm nào đổi sang
+cái máy khác là lại chế cục mới. LangChain là cái ổ cắm chuẩn: mọi mảnh của RAG đều được làm
+cho ra cùng một hình phích, nên bạn cắm cái nào vào cũng vừa, và rút cái này ra thay cái khác
+mà không phải đụng vào phần còn lại. Nói cách khác, nó biến đống mảnh rời của [bài 1](#/blog/rag-fundamentals) thành
+những viên Lego ăn khớp với nhau.
+
+Cụ thể hơn, nếu bạn tự viết RAG không dùng framework thì sẽ gặp gì? Bạn cần: gọi API của một
+nhà cung cấp model (OpenAI, Anthropic, Google, hay Ollama chạy local), mỗi hãng một format
+request và response khác nhau; đọc file PDF, Markdown, HTML; cắt text thành đoạn; gọi một API
+embedding khác; lưu vector vào một database; viết hàm tìm kiếm; ghép prompt; parse kết quả.
+Chừng đó việc là chừng đó đoạn glue code (code dán). Rồi một ngày bạn muốn đổi từ GPT sang
+Claude để so sánh, hay đổi vector store từ Chroma sang Postgres, và nhận ra code dán dính chặt
+vào hãng cũ.
 
 LangChain tự mô tả mục tiêu của nó trong
 [trang triết lý thiết kế](https://docs.langchain.com/oss/python/langchain/philosophy): các
@@ -160,7 +171,7 @@ từ. `add_start_index=True` ghi vị trí ký tự của chunk vào metadata, r
 định. Ngoài ra có `MarkdownHeaderTextSplitter` (cắt theo heading, giữ heading làm metadata)
 và `CharacterTextSplitter.from_tiktoken_encoder` (đếm theo token thay vì ký tự).
 
-- **Trong RAG:** quyết định chất lượng retrieval nhiều hơn mọi thứ khác; bài 3 bàn kỹ.
+- **Trong RAG:** quyết định chất lượng retrieval nhiều hơn mọi thứ khác; [bài 3](#/blog/rag-production-techniques) bàn kỹ.
 - **Trong Agent:** không có vai trò lúc runtime, trừ khi agent tự index tài liệu mới.
 
 ### Embeddings
@@ -258,8 +269,8 @@ agents are built on top of LangGraph."
 Tính năng định hình của `create_agent` là **middleware**: các hook `before_model`,
 `after_model`, `wrap_tool_call`... để tóm tắt lịch sử, che PII, bắt duyệt tay trước tool
 nhạy cảm. Khi bạn cần luồng không khớp với "một vòng lặp model-tool" (nhiều agent, rẽ nhánh
-định trước, chờ con người ở giữa), bạn xuống thẳng LangGraph và tự vẽ graph. Bài 4 của series
-dành riêng cho việc đó.
+định trước, chờ con người ở giữa), bạn xuống thẳng LangGraph và tự vẽ graph.
+[Bài 4](#/blog/langgraph-ai-agents) của series dành riêng cho việc đó.
 
 ### Memory và chat history
 
@@ -833,6 +844,9 @@ model, parser lúc hỏi. Trong agent, cùng những mảnh đó nhưng retrieve
 thành vòng lặp, và vòng lặp chạy trên LangGraph. Codebase mẫu `docs-rag` đặt mỗi mảnh vào
 một file, mỗi giai đoạn vào một thư mục, để người đọc cây thư mục là đọc được pipeline.
 
-Bài tiếp theo bàn về chỗ hệ thống này sẽ hỏng khi gặp dữ liệu thật: chunk cắt sai, retriever
-lấy nhầm, model trả lời "nghe có vẻ đúng", và những kỹ thuật để sửa từng chỗ, cùng cách đo
-để biết có cần sửa hay không.
+Nhưng nói thẳng: cái `docs-rag` vừa build là bản RAG "ngây thơ". Chạy demo thì đẹp, còn gặp
+tài liệu thật và người dùng thật thì nó bắt đầu lấy nhầm đoạn, hiểu sai câu hỏi mơ hồ, chậm
+dần, tốn tiền hơn dự tính, và không ai đo được nó đang tốt hay tệ. LangChain cho bạn các mảnh
+ghép chuẩn, nhưng không cho bạn biết mảnh nào đang hỏng. [Bài 3](#/blog/rag-production-techniques)
+bắt đầu từ đúng chỗ đó: đi qua từng giai đoạn của pipeline này, chỉ ra nó hỏng thế nào, kỹ
+thuật nào sửa được, và đo bằng gì để biết có cần sửa hay không.

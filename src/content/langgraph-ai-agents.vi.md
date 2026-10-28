@@ -7,15 +7,15 @@ summary: "LangChain dừng ở đâu, LangGraph bắt đầu ở đâu; từng t
 
 # LangGraph và AI Agent: từ workflow có vòng lặp đến hệ thống nhiều nhánh
 
-Bài trước dừng ở một pipeline RAG viết bằng LangChain: nạp tài liệu, chunk, embed, retrieve, prompt, gọi model. Pipeline đó chạy một chiều, từ trái sang phải, và chạy đúng một lần. Bài này nói về chuyện gì xảy ra khi bạn cần nhiều hơn thế: quay lại một bước, rẽ nhánh theo kết quả, dừng chờ người duyệt, rồi chạy tiếp hôm sau mà không mất gì. Đó là chỗ của LangGraph. Nửa sau bài dùng chính những khối đó để dựng một AI agent chăm sóc khách hàng cho sàn thương mại điện tử, với tool được gói theo chuẩn MCP.
+Ở [bài 2](#/blog/langchain-rag-from-scratch) mình dựng một pipeline RAG bằng LangChain, và ở [bài 3](#/blog/rag-production-techniques) mình tinh chỉnh nó cho production: hybrid search, reranker, đo bằng RAGAS. Nhưng kể cả một RAG đã tinh chỉnh kỹ vẫn là đường một chiều: tra một lần, trả lời một lần. Nó không quay lại thử lần nữa khi kết quả tệ, không chọn đường đi khác tuỳ câu hỏi, không làm được hành động gì (tra đơn hàng, tạo lệnh hoàn tiền), và không dừng lại chờ người duyệt. Chain của LangChain chạy thẳng một đường. Bài này là về việc sửa đúng điểm yếu đó: LangGraph thêm vòng lặp, rẽ nhánh, bộ nhớ chung và điểm dừng; rồi trên nền đó, AI agent cho model tự quyết bước tiếp theo. Nửa sau bài dùng chính những khối đó để dựng một agent chăm sóc khách hàng cho sàn thương mại điện tử, với tool được gói theo chuẩn MCP.
 
 Phiên bản dùng trong bài: LangGraph 1.2.x và LangChain 1.4.x (Python), kiểm tra trên tài liệu chính thức tại thời điểm viết. API của LangGraph đã ổn định từ 1.0, nhưng phần tích hợp MCP trong LangChain vẫn đang ở trạng thái beta, tôi sẽ nói rõ ở phần đó.
 
 ## 1. LangChain dừng ở đâu, LangGraph bắt đầu ở đâu
 
-LangChain cho bạn các khối ghép: model, prompt, parser, retriever, tool. Cách ghép mặc định của nó là *chain*: đầu ra của khối này là đầu vào của khối sau. Về bản chất, một chain là một đồ thị có hướng không có chu trình (DAG): dữ liệu chảy một chiều và không bao giờ quay đầu.
+Nói nôm na thế này. Một chain của LangChain giống một dây chuyền lắp ráp: nguyên liệu vào đầu này, đi qua từng trạm, ra sản phẩm ở đầu kia. Dây chuyền chỉ chạy tới. Nó không quay lại trạm trước khi phát hiện lỗi. Nó không tự rẽ sang dây chuyền khác tuỳ nguyên liệu. Nó không dừng lại chờ quản đốc ký. Và nếu mất điện giữa chừng, nó không nhớ mình đang làm tới đâu. Với những việc kiểu "đọc rồi trả lời", dây chuyền là đủ. Nhưng việc thật thường có hình dạng khác: thử lại, rẽ nhánh, chờ người, chạy dở rồi chạy tiếp.
 
-Rất nhiều việc thật không có hình dạng đó. Hãy liệt kê thẳng những gì một chain thuần không làm được, hoặc làm được rất gượng:
+Nói bằng ngôn ngữ kỹ thuật: LangChain cho bạn các khối ghép (model, prompt, parser, retriever, tool) và cách ghép mặc định là *chain*, đầu ra của khối này là đầu vào của khối sau. Một chain là một đồ thị có hướng không có chu trình (DAG): dữ liệu chảy một chiều và không bao giờ quay đầu. Liệt kê thẳng những gì một chain thuần không làm được, hoặc làm được rất gượng:
 
 - **Vòng lặp.** "Retrieve, nếu kết quả không đủ tốt thì viết lại câu hỏi và retrieve lại" là một vòng lặp. Chain không có cạnh quay ngược.
 - **Rẽ nhánh theo trạng thái.** Bước tiếp theo phụ thuộc vào kết quả của bước trước (câu hỏi này về đơn hàng hay về chính sách?). Bạn có thể viết `if` trong code, nhưng khi có năm nhánh, mỗi nhánh ba bước, code thành một cái cây lồng nhau mà không ai còn nhìn ra luồng.
@@ -27,7 +27,9 @@ Rất nhiều việc thật không có hình dạng đó. Hãy liệt kê thẳn
 
 LangGraph ra đời để làm đúng những việc này. Theo tài liệu chính thức, nó tự mô tả là một "low-level orchestration framework and runtime" cho các agent có trạng thái và chạy lâu, và nói rõ bạn không cần LangChain để dùng nó (dù trong thực tế hai thứ gần như luôn đi cùng nhau: LangChain cung cấp model, tool, message; LangGraph cung cấp cách điều phối chúng). Tầng cao hơn, `create_agent` của LangChain 1.x, cũng được xây trên LangGraph.
 
-Cách LangGraph giải quyết các vấn đề trên, nói gọn trong một câu: **bạn mô tả quy trình như một máy trạng thái tường minh, tức một đồ thị gồm các node làm việc trên một trạng thái dùng chung, có thể có chu trình, và runtime lưu lại trạng thái đó sau mỗi bước (checkpoint).**
+LangGraph giải quyết chuyện này thế nào? Hình dung thế này. Thay vì một dây chuyền, bạn vẽ một sơ đồ luồng giống bàn cờ. Các ô là chỗ làm việc. Các mũi tên nói "xong ô này thì sang ô nào", và mũi tên được phép quay ngược về ô cũ. Tất cả các ô cùng ghi vào một cuốn sổ chung: ô sau mở sổ ra là biết ô trước đã làm gì. Và sau mỗi ô, hệ thống tự lưu lại, như game lưu màn chơi: tắt máy, mai mở lên, chơi tiếp đúng chỗ đó. Chỉ bốn thứ ấy thôi là bạn có vòng lặp (mũi tên quay ngược), rẽ nhánh (mũi tên có điều kiện), bộ nhớ chung (cuốn sổ) và dừng rồi tiếp (điểm lưu).
+
+Nói bằng thuật ngữ, gọn trong một câu: **bạn mô tả quy trình như một máy trạng thái tường minh, tức một đồ thị gồm các node làm việc trên một trạng thái dùng chung, có thể có chu trình, và runtime lưu lại trạng thái đó sau mỗi bước (checkpoint).**
 
 Ba ý trong câu đó giải quyết ba nhóm vấn đề:
 
@@ -42,6 +44,8 @@ Phần còn lại chỉ là đi vào từng mảnh.
 Người mới học LangGraph thường bị rối không phải vì khái niệm khó, mà vì tài liệu kể tên nhiều thứ cùng lúc. Dưới đây tôi đi theo thứ tự bạn sẽ gặp khi viết một graph thật, và với mỗi thành phần trả lời hai câu: nó *chứa* gì, và nó *để làm* gì.
 
 ### State: cái bảng chung mà mọi node cùng viết lên
+
+Nói nôm na: state là cuốn sổ chung của cả quy trình. Sổ có sẵn các mục (câu hỏi là gì, đã tìm được gì, đã thử mấy lần). Ai làm xong việc thì ghi vào đúng mục của mình; người sau mở sổ ra đọc. Không ai cầm sổ riêng, chỉ có một cuốn. Mặc định ghi mới thì xoá cũ, nhưng với vài mục (như lịch sử trò chuyện) bạn dặn trước: "mục này chỉ được viết thêm, không được xoá".
 
 **Chứa gì:** một schema, thường là một `TypedDict`, liệt kê các trường dữ liệu mà quy trình cần theo dõi. Ví dụ: câu hỏi gốc, câu truy vấn hiện tại, các chunk đã tìm được, số lần đã thử.
 
@@ -76,6 +80,8 @@ Một ý quan trọng về bản chất: *state không phải là bộ nhớ c�
 
 ### Node: một bước làm việc
 
+Nói nôm na: node là một người làm một việc. Người này mở sổ, đọc những gì mình cần, làm việc của mình (tra tài liệu, hỏi model, gọi một dịch vụ bên ngoài), rồi ghi kết quả vào sổ. Hết. Họ không gọi người khác; ai làm tiếp không phải việc của họ.
+
 **Chứa gì:** một hàm Python (đồng bộ hoặc `async`) nhận state hiện tại, trả về dict chứa các trường cần cập nhật. Bên trong là bất cứ gì: gọi LLM, gọi retriever, gọi API, hay chỉ là một đoạn `if`.
 
 **Để làm gì:** là đơn vị nhỏ nhất mà runtime chạy, lưu checkpoint và stream kết quả. Vì vậy ranh giới node nên trùng với ranh giới "điều bạn muốn quan sát hoặc tiếp tục lại được". Một node gọi LLM rồi gọi API rồi ghi DB là một node quá to: nếu lỗi ở bước ghi DB, resume sẽ chạy lại cả LLM.
@@ -89,6 +95,8 @@ def retrieve(state: State) -> dict:
 Đăng ký node bằng `builder.add_node("retrieve", retrieve)`. Nếu bỏ tên, LangGraph lấy tên hàm.
 
 ### Edge: ai chạy tiếp sau ai
+
+Nói nôm na: edge là mũi tên trên sơ đồ, trả lời câu "xong việc này thì sang việc nào". Có hai loại. Mũi tên cố định: xong A luôn sang B. Mũi tên có điều kiện: có một người gác cổng đứng đó, mở sổ ra xem rồi chỉ đường, "kết quả tốt thì sang trả lời, chưa tốt thì quay về tìm lại". Người gác cổng không làm việc gì khác ngoài chỉ đường. Chính loại mũi tên này tạo ra rẽ nhánh và vòng lặp.
 
 **Chứa gì:** hai loại. Edge thường là một cặp tên node: xong A thì chạy B. Edge có điều kiện là một *hàm định tuyến* (routing function): nhận state, trả về tên node tiếp theo.
 
@@ -115,9 +123,13 @@ Hàm định tuyến chỉ nên đọc state và trả tên node. Đừng gọi 
 
 ### START và END: hai điểm neo
 
+Nói nôm na: START là cửa vào, END là cửa ra của sơ đồ. Không ai làm việc ở cửa. Chúng có mặt chỉ để bạn vẽ được mũi tên "bắt đầu từ ô nào" và "xong ô nào thì ra".
+
 `START` là node ảo đại diện cho "đầu vào của người gọi"; `END` là "trả kết quả về". Chúng không chạy gì cả. Chúng tồn tại để bạn vẽ edge từ đầu vào tới node đầu tiên và từ node cuối ra ngoài, giống như mọi edge khác. Một graph có thể có nhiều đường tới `END`.
 
 ### StateGraph và compile(): bản thiết kế và cái máy
+
+Nói nôm na: StateGraph là bản vẽ trên giấy, bạn thêm ô và mũi tên vào đó. compile là lúc soát bản vẽ (có ô nào không mũi tên nào dẫn tới không, có mũi tên nào trỏ vào ô không tồn tại không) rồi dựng nó thành cái máy chạy được. Lúc dựng máy cũng là lúc bạn cắm thêm đồ: cuốn sổ lưu ở đâu, dừng ở chỗ nào.
 
 `StateGraph(State)` là *builder*: bạn thêm node, thêm edge vào nó. Nó chưa chạy được. `builder.compile()` kiểm tra đồ thị (node nào không có đường tới, edge nào trỏ vào tên không tồn tại), rồi trả về một graph chạy được với giao diện quen thuộc của LangChain: `invoke`, `stream`, `ainvoke`, `astream`.
 
@@ -126,6 +138,8 @@ Mọi thứ "hạ tầng" được cắm vào lúc compile: `compile(checkpointe
 Hai lưới an toàn nên biết: `GraphRecursionError` được ném ra khi graph chạy quá `recursion_limit` bước (đặt trong `config` khi invoke), để một vòng lặp viết sai không chạy mãi; và kiểu trả về `Literal[...]` trên hàm định tuyến giúp LangGraph vẽ được đồ thị và bắt lỗi tên node sớm.
 
 ### Checkpointer và thread_id: trạng thái sống qua các lần gọi
+
+Nói nôm na: checkpointer là chức năng lưu game. Sau mỗi ô, nó chụp lại cuốn sổ và cất đi. thread_id là tên file save: mỗi cuộc hội thoại một file. Mở lại đúng tên file đó là chơi tiếp đúng chỗ cũ, cả lịch sử trò chuyện lẫn những gì đã tra. Mở tên file khác là một ván mới, sổ trắng.
 
 **Chứa gì:** một backend lưu trữ (RAM, SQLite, Postgres) và, với mỗi *thread*, một chuỗi các *checkpoint*: ảnh chụp state sau từng bước.
 
@@ -147,6 +161,8 @@ graph.invoke(ask("Còn đơn kia?"), config)   # cùng thread_id: nhớ câu tr�
 Tài liệu persistence còn phân biệt *checkpointer* (bộ nhớ ngắn hạn, theo thread) với *store* (bộ nhớ dài hạn, dùng chung giữa các thread, dạng key-value, ví dụ sở thích khách hàng). Store cắm qua `compile(store=InMemoryStore())`. Bài này chỉ dùng checkpointer.
 
 ### interrupt(): dừng chờ người, rồi chạy tiếp
+
+Nói nôm na: interrupt là nút tạm dừng đặt ngay trong một ô, kèm một tờ giấy đưa ra ngoài: "việc này cần người duyệt, đây là thông tin". Máy dừng, lưu game, trả tờ giấy cho bạn. Khi có quyết định, bạn đưa quyết định vào, máy mở file save và chạy tiếp từ ô đó. Vài giây sau cũng được, sáng hôm sau cũng được.
 
 **Chứa gì:** một hàm gọi bên trong node. `interrupt(payload)` dừng graph ngay tại đó, lưu checkpoint, và trả `payload` ra cho người gọi dưới khoá `__interrupt__`. Khi bạn gọi lại graph với `Command(resume=value)` trên cùng `thread_id`, node chạy lại và lần này `interrupt()` trả về `value`.
 
@@ -174,15 +190,21 @@ Có một chi tiết về bản chất mà tài liệu nhấn mạnh và rất �
 
 ### Command và Send: hai cách rẽ nhánh nâng cao
 
+Nói nôm na: Command là khi người làm việc vừa ghi sổ vừa tự chỉ đường luôn, không cần người gác cổng riêng. Send là khi một việc cần chia cho nhiều người làm cùng lúc, mỗi người một phần, rồi gom kết quả lại, và số người chỉ biết lúc làm.
+
 `Command` cho một node vừa cập nhật state vừa chỉ định node tiếp theo trong cùng một giá trị trả về: `return Command(update={"intent": "refund"}, goto="refund_check")`. Nó gộp "node + edge có điều kiện" thành một, hữu ích khi quyết định định tuyến phụ thuộc vào thứ node vừa tính ra. Tôi vẫn thích tách hàm định tuyến riêng vì nhìn danh sách edge rõ hơn, nhưng `Command` là công cụ đúng khi node con trong subgraph cần nhảy về node của graph cha (`graph=Command.PARENT`).
 
 `Send` dùng cho map-reduce: một hàm định tuyến trả về một danh sách `Send("worker", {"item": x})`, mỗi cái khởi động một bản `worker` với state riêng, chạy song song, rồi kết quả gộp lại qua reducer. Dùng khi số nhánh chỉ biết lúc chạy (chia một tài liệu thành N phần, tóm tắt từng phần).
 
 ### Subgraph: graph trong graph
 
+Nói nôm na: subgraph là một sơ đồ con được gói lại thành một ô trong sơ đồ lớn. Nhìn từ ngoài nó là một ô; mở ra bên trong là cả một quy trình. Giống một phòng ban trong công ty: bạn giao việc cho phòng, bên trong họ chia nhau thế nào là chuyện của họ.
+
 Một graph đã compile có thể làm node của graph khác. Nếu hai graph dùng chung tên trường trong state, bạn `add_node("branch", subgraph)` thẳng; nếu khác schema, bạn viết một node bọc: đổi state cha thành input con, `subgraph.invoke`, đổi kết quả về state cha. Dùng để đóng gói một nhánh phức tạp (toàn bộ luồng hoàn tiền) thành một khối tái sử dụng và kiểm thử riêng. Lưu ý từ tài liệu: graph cha phải compile với checkpointer thì interrupt trong subgraph mới hoạt động.
 
 ### Streaming: nhìn graph chạy
+
+Nói nôm na: streaming là xem máy chạy theo thời gian thực thay vì đứng chờ kết quả cuối. Bạn chọn xem gì: ô nào vừa xong và ghi gì vào sổ, hay từng chữ model đang gõ. Với người dùng, đó là khác biệt giữa màn hình trống mười giây và dòng chữ "đang tra đơn hàng của bạn".
 
 `graph.stream(inputs, stream_mode=...)` trả về từng mảnh khi graph chạy. Các chế độ đáng dùng: `updates` (mỗi node vừa trả về gì), `values` (toàn bộ state sau mỗi bước), `messages` (từng token LLM sinh ra, kèm metadata), `custom` (dữ liệu bạn tự phát từ trong node). Có thể truyền một list để nhận nhiều chế độ cùng lúc. Với giao diện chat, `messages` là cái bạn muốn; với debug, `updates` cho bạn thấy đúng thứ tự node và phần state mỗi node thay đổi.
 
@@ -305,7 +327,7 @@ result = graph.invoke({"question": q, "query": q, "docs": [], "good_enough": Fal
 
 Để ý ba điều. `question` không bao giờ đổi, `query` đổi một lần; cả hai cùng nằm trong state nên node `answer` có thể dùng câu hỏi gốc dù retrieve chạy với câu đã viết lại. `attempts` tăng trong `retrieve`, không phải trong `rewrite`, để lần retrieve đầu cũng được đếm. Và hàm định tuyến không gọi model: nó chỉ đọc hai trường mà node `grade` đã ghi.
 
-Khi nào *không* cần cái này: nếu retriever của bạn tốt (hybrid search, reranker như bài 3 đã bàn) và câu hỏi người dùng thường rõ ràng, một vòng lặp grade/rewrite thêm hai lần gọi LLM cho mỗi câu hỏi mà chỉ cứu được một phần nhỏ. Đo tỉ lệ grade trả về False trước khi quyết định giữ nó. Một hệ thống tốt là hệ thống đơn giản nhất vượt qua được bar chất lượng.
+Khi nào *không* cần cái này: nếu retriever của bạn tốt (hybrid search, reranker như [bài 3](#/blog/rag-production-techniques) đã bàn) và câu hỏi người dùng thường rõ ràng, một vòng lặp grade/rewrite thêm hai lần gọi LLM cho mỗi câu hỏi mà chỉ cứu được một phần nhỏ. Đo tỉ lệ grade trả về False trước khi quyết định giữ nó. Một hệ thống tốt là hệ thống đơn giản nhất vượt qua được bar chất lượng.
 
 ## 4. AI Agent là gì, và nó giải quyết được gì
 
@@ -321,6 +343,8 @@ Một chatbot RAG, kể cả có vòng lặp như trên, vẫn có mấy giới 
 
 ### Bản chất một "AI agent"
 
+Nói nôm na thế này. Trong workflow, một người (lập trình viên) đã vẽ sẵn đường đi trên sơ đồ: xong việc này thì sang việc kia, mọi tình huống đều tính trước. Trong agent, đường đi không vẽ sẵn. Bạn đưa cho model một mục tiêu và một hộp dụng cụ, rồi model tự đi: nhìn tình hình, nghĩ xem nên làm gì, chọn một dụng cụ và dùng, nhìn kết quả, rồi lại nghĩ tiếp. Cứ thế cho tới khi nó thấy đã xong, hoặc tới khi hết số lượt cho phép. Giống như giao việc cho một nhân viên mới: workflow là đưa họ tờ checklist từng bước; agent là nói rõ mục tiêu, chỉ cho họ các công cụ trong văn phòng, và để họ tự xử. Cái làm nên agent không phải là có model hay có công cụ, mà là *ai quyết định bước tiếp theo*: người vẽ sẵn, hay model quyết tại chỗ.
+
 Bài "Building effective agents" của Anthropic đưa ra cách phân biệt mà tôi thấy sạch nhất. Họ gọi chung mọi thứ là *agentic systems*, rồi tách hai kiến trúc:
 
 - **Workflow:** LLM và tool được điều phối theo *những đường đi code đã định sẵn*.
@@ -328,7 +352,7 @@ Bài "Building effective agents" của Anthropic đưa ra cách phân biệt mà
 
 Và câu nói thẳng nhất trong bài: trong thực tế, agent "thường chỉ là LLM dùng tool dựa trên phản hồi từ môi trường, trong một vòng lặp".
 
-Vậy điều làm một hệ thống thành agent không phải là có LLM, không phải là có tool, mà là **ai quyết định bước tiếp theo**. Trong case Q&A ở phần 3, code quyết định (hàm `route_after_grade`): đó là workflow. Nếu thay bằng một LLM được cho danh sách tool (retrieve, rewrite, answer) và tự chọn gọi gì tiếp, lặp đến khi nó quyết định xong: đó là agent.
+Vậy, nói lại bằng thuật ngữ: điều làm một hệ thống thành agent là **ai quyết định bước tiếp theo**. Trong case Q&A ở phần 3, code quyết định (hàm `route_after_grade`): đó là workflow. Nếu thay bằng một LLM được cho danh sách tool (retrieve, rewrite, answer) và tự chọn gọi gì tiếp, lặp đến khi nó quyết định xong: đó là agent.
 
 Vòng lặp của agent nhìn như sau: *quan sát* (đọc yêu cầu, đọc state, đọc kết quả tool vừa về), *suy luận* (chọn hành động tiếp), *hành động* (gọi tool), rồi quay lại quan sát kết quả. Kèm theo là *bộ nhớ* (lịch sử hội thoại và kết quả các bước) và một *điều kiện dừng* (mục tiêu đạt được, hoặc số bước tối đa). Trong LangGraph, vòng lặp đó là hai node và một edge có điều kiện: node gọi model, node chạy tool, và hàm định tuyến hỏi "message cuối có `tool_calls` không?".
 
@@ -350,14 +374,14 @@ Các hệ thống nội bộ: cơ sở dữ liệu đơn hàng, API hoàn tiền
 
 ### MCP trong một đoạn ngắn
 
-MCP (Model Context Protocol) là một giao thức mở để ứng dụng AI nói chuyện với nguồn dữ liệu và tool bên ngoài theo một chuẩn chung. Bài 5 sẽ đi sâu; ở đây chỉ cần từ vựng đủ dùng:
+MCP (Model Context Protocol) là một giao thức mở để ứng dụng AI nói chuyện với nguồn dữ liệu và tool bên ngoài theo một chuẩn chung. [Bài 5](#/blog/mcp-model-context-protocol) sẽ đi sâu; ở đây chỉ cần từ vựng đủ dùng:
 
 - **MCP host** là ứng dụng AI (ở đây là app agent của ta). Host tạo **MCP client**, mỗi client giữ một kết nối tới một **MCP server**. Bốn server thì bốn client.
 - Một server phơi ra **tools**, mỗi tool có `name`, `description` và `inputSchema` (một JSON Schema mô tả tham số).
 - Client khám phá tool bằng request `tools/list`, và gọi tool bằng `tools/call` với `name` và `arguments`. Kết quả về là một mảng `content` (thường là text) kèm cờ `isError`.
 - Thông điệp là JSON-RPC 2.0; vận chuyển bằng stdio (server chạy cục bộ như một tiến trình con) hoặc streamable HTTP (server chạy ở xa).
 
-Bản spec hiện hành là revision 2026-07-28 (giao thức stateless, khám phá server qua `server/discover`); phần tool, gồm `tools/list` và `tools/call`, không đổi so với revision 2025-06-18 mà tôi dẫn ở cuối bài. Bài 5 sẽ đi vào các khác biệt đó.
+Bản spec hiện hành là revision 2026-07-28 (giao thức stateless, khám phá server qua `server/discover`); phần tool, gồm `tools/list` và `tools/call`, không đổi so với revision 2025-06-18 mà tôi dẫn ở cuối bài. [Bài 5](#/blog/mcp-model-context-protocol) sẽ đi vào các khác biệt đó.
 
 Một tool trên server đơn hàng trông như sau trong phản hồi `tools/list`:
 
@@ -666,7 +690,9 @@ support-agent/
 
 Đọc xong một kiến trúc nhiều hộp, phản xạ tự nhiên là muốn xây đủ hộp. Hãy cưỡng lại. Nếu 90% tin nhắn là hỏi chính sách, một RAG chain với câu từ chối tử tế cho phần còn lại là đủ, và nó rẻ hơn, nhanh hơn, dễ debug hơn. Thêm `router` khi bạn thật sự có nhánh thứ hai cần hành động. Thêm `interrupt()` khi có hành động mà sai thì tốn tiền. Thêm nhánh agent (model tự chọn tool) khi số bước thật sự không đoán trước được. Và đo từng bước thêm vào bằng bộ eval, không bằng cảm giác.
 
-LangGraph không làm hệ thống thông minh hơn. Nó làm cho luồng điều khiển trở nên **tường minh, lưu được và tiếp tục được**. Đó là ba thứ bạn cần khi một hệ thống LLM bắt đầu được phép hành động thay vì chỉ trả lời. Bài tiếp theo đi sâu vào MCP: tại sao API truyền thống khó với LLM, và từng thành phần của giao thức làm gì.
+LangGraph không làm hệ thống thông minh hơn. Nó làm cho luồng điều khiển trở nên **tường minh, lưu được và tiếp tục được**. Đó là ba thứ bạn cần khi một hệ thống LLM bắt đầu được phép hành động thay vì chỉ trả lời.
+
+Nhưng agent chỉ hữu ích bằng đúng những tool nó có trong tay, và đó là điểm yếu bài này chưa xử lý. Ở trên tôi coi như bốn hệ thống nội bộ đã nằm sau MCP server sẵn rồi. Thực tế thường không thế: mỗi tool là một API khác nhau, mỗi app lại tự viết lớp nối cho từng tool, N app nhân M tool là N nhân M lần đi dây bằng tay. [Bài 5](#/blog/mcp-model-context-protocol) bắt đầu từ đúng chỗ đó: MCP là một ổ cắm chuẩn giữa agent và tool, và từng thành phần của nó làm gì.
 
 ## Nguồn
 

@@ -14,23 +14,29 @@ phải có mặt ở đó. Các bài sau mới xây bằng LangChain, tối ưu,
 
 ## 1. LLM mạnh ở đâu, và yếu cố hữu ở đâu
 
-Trước khi nói về điểm yếu, cần hiểu LLM (large language model, mô hình ngôn ngữ lớn) được tạo ra
-và sinh chữ như thế nào, vì mọi điểm yếu bên dưới đều bắt nguồn từ đó.
+Trước khi nói về điểm yếu, cần hiểu LLM (large language model, mô hình ngôn ngữ lớn, tức là
+"bộ não" đứng sau ChatGPT, Claude hay Gemini) được tạo ra và sinh chữ như thế nào, vì mọi điểm
+yếu bên dưới đều bắt nguồn từ đó.
 
 ### LLM được huấn luyện và sinh chữ như thế nào
 
-Một LLM là một mạng nơ-ron với hàng tỷ tham số (parameter: các con số bên trong mô hình, được
-chỉnh dần trong lúc huấn luyện). Nó được huấn luyện trên một khối văn bản khổng lồ được thu
-thập **đến một thời điểm nhất định**, với đúng một bài tập: nhìn đoạn chữ đứng trước, đoán token
-tiếp theo (token: đơn vị chữ mà mô hình xử lý, thường là một từ hoặc một mảnh từ). Làm bài tập
-đó hàng nghìn tỷ lần, mô hình "nén" các quy luật ngôn ngữ, và kèm theo đó là rất nhiều sự kiện,
-vào tham số của nó.
+Nói nôm na thế này. Hình dung một người đọc gần như toàn bộ chữ viết trên Internet, nhưng chỉ
+đọc đến một ngày nhất định rồi dừng. Sau đó mọi cuốn sách bị cất đi. Thứ còn lại trong đầu người
+đó không phải là các trang sách, mà là một "cảm giác" rất tốt về việc chữ nào hay đi sau chữ
+nào, kèm theo rất nhiều sự kiện nhớ mang máng. Khi bạn hỏi, người đó không được mở sách; họ chỉ
+nói ra câu nghe xuôi tai nhất dựa trên trí nhớ. Đó chính là một LLM.
 
-Khi bạn hỏi, mô hình không "tra" đâu cả. Nó nhận prompt (toàn bộ văn bản bạn đưa vào), tính xác
-suất cho token kế tiếp, chọn một token, nối vào, rồi lặp lại. Câu trả lời là chuỗi token có xác
-suất cao, được sinh ra từ những gì nó nhớ trong tham số cộng với những gì có trong prompt. Hai
-nguồn thông tin đó là tất cả những gì mô hình có. Nhớ kỹ câu này, vì RAG xoay quanh nguồn thứ
-hai.
+Giờ nói lại bằng từ kỹ thuật, mỗi từ giải thích một lần. Mô hình là một cỗ máy tính toán chứa
+hàng tỷ con số, gọi là tham số (parameter) hay trọng số (weight); huấn luyện là quá trình chỉnh
+đi chỉnh lại các con số đó. Văn bản được cắt thành các mẩu nhỏ gọi là token, thường là một từ
+hoặc một mảnh từ. Bài tập huấn luyện chỉ có một: nhìn các mẩu chữ đứng trước, đoán mẩu tiếp
+theo. Làm bài tập đó hàng nghìn tỷ lần trên khối văn bản thu thập **đến một thời điểm nhất
+định**, các con số dần "nén" lại cả quy luật ngôn ngữ lẫn vô số sự kiện.
+
+Khi bạn hỏi, mô hình không tra cứu gì cả. Nó nhận prompt (prompt là toàn bộ văn bản bạn đưa
+vào, gồm câu hỏi và mọi thứ kèm theo), đoán mẩu chữ kế tiếp, nối vào, rồi lặp lại cho đến khi
+hết câu. Câu trả lời được dệt từ đúng hai nguồn: những gì các con số "nhớ", và những gì có trong
+prompt. Hãy nhớ kỹ câu này, vì RAG xoay quanh nguồn thứ hai.
 
 Từ cơ chế đó, sáu điểm yếu sau đây là hệ quả tất yếu, không phải lỗi của một nhà cung cấp nào.
 
@@ -123,15 +129,21 @@ và đo được.
 
 ## 3. Bản chất của RAG: thi mở sách thay vì thi đóng sách
 
-Toàn bộ tư tưởng của RAG gói trong một câu: **trước khi hỏi, tìm những đoạn tài liệu liên quan
-và dán chúng vào prompt, để mô hình có đủ thông tin cần thiết ngay trước mắt.**
+Hình dung thế này. Bạn đi thi. Thi đóng sách, bạn chỉ có những gì đã học thuộc; gặp câu hỏi về
+thứ chưa từng học, bạn hoặc bỏ trống, hoặc viết đại một câu nghe có vẻ đúng. Thi mở sách, bạn
+vẫn là bạn, nhưng được mang tài liệu vào, lật đúng trang, rồi mới viết. Câu trả lời đúng hơn
+hẳn, và bạn còn ghi được "theo trang 12".
 
-Hãy hình dung một kỳ thi. Thi đóng sách: bạn chỉ có những gì đã học thuộc; gặp câu hỏi về nội
-dung chưa học, bạn hoặc bỏ trống, hoặc viết đại một câu nghe có vẻ đúng. Thi mở sách: bạn vẫn là
-bạn, nhưng được mang tài liệu vào và lật đúng trang. Câu trả lời sẽ chính xác hơn, và bạn ghi
-được "theo trang 12". Điểm then chốt: thi mở sách không làm bạn thông minh hơn, nó làm bạn
-**có thông tin hơn**. RAG cũng không làm LLM thông minh hơn; nó chỉ bảo đảm mô hình được đọc
-đúng trang trước khi trả lời.
+Để ý một điều: thi mở sách không làm bạn thông minh hơn. Nó chỉ làm bạn **có thông tin hơn**
+đúng lúc cần. RAG làm y hệt vậy với mô hình. Nói nôm na, RAG là: trước khi để mô hình trả lời,
+hãy đi tìm vài đoạn tài liệu nói về đúng chuyện đang hỏi, đặt chúng ngay trước mặt mô hình cùng
+với câu hỏi, và bảo nó "trả lời dựa trên mấy đoạn này". Mô hình không cần nhớ gì về công ty
+bạn; nó chỉ cần được đọc đúng trang.
+
+Vậy nên cái tên Retrieval-Augmented Generation, nghe dài dòng, thực ra chỉ là ba động tác: đi tìm
+(retrieval), bổ sung vào câu hỏi (augmented), rồi mới viết câu trả lời (generation). Mọi thứ còn
+lại trong bài này, chunk, embedding, vector store, reranker, chỉ là cách làm cho động tác "đi
+tìm" nhanh và trúng.
 
 ![LLM một mình giống thi đóng sách: chỉ có trí nhớ, trả lời trôi chảy nhưng có thể cũ hoặc bịa; LLM cộng retrieval giống thi mở sách: câu hỏi đi qua retriever lấy đoạn văn từ tài liệu, ghép vào prompt rồi mới sinh câu trả lời có trích dẫn](blog/rag-fundamentals-open-book.svg)
 
@@ -199,7 +211,8 @@ thành một. Chunk là cắt văn bản thành các đoạn nhỏ (chunk), thư
 hai lý do: embedding của một đoạn quá dài sẽ "mờ" (một vector không thể đại diện tốt cho mười
 chủ đề), và vì lúc trả lời ta chỉ muốn dán đúng đoạn liên quan, không phải cả tài liệu. Cách
 cắt đơn giản nhất là theo kích thước cố định có chồng lấn (overlap) để câu bị cắt đôi vẫn nguyên
-vẹn trong ít nhất một chunk. Các cách cắt thông minh hơn sẽ nói ở bài 3.
+vẹn trong ít nhất một chunk. Các cách cắt thông minh hơn sẽ nói ở
+[bài 3](#/blog/rag-production-techniques).
 
 **Embed.** Embedding là một danh sách số (vector) mô tả ý nghĩa của một đoạn văn, sao cho hai
 đoạn có nghĩa gần nhau thì có vector gần nhau. Tài liệu của OpenAI định nghĩa ngắn gọn: khoảng
@@ -366,13 +379,17 @@ Và ngay cả khi RAG là lựa chọn đúng, hãy bắt đầu từ phiên b�
 một embedding model, top-5, một prompt rõ ràng. Đo. Rồi mới thêm BM25, reranker, viết lại câu
 hỏi, từng thứ một, khi số đo cho thấy cần.
 
-## 8. Tiếp theo trong series
-
-Bài này cố tình không có framework để bạn thấy RAG chỉ là: chuẩn bị sách, lật đúng trang, bắt
-mô hình đọc trang đó rồi mới trả lời. Bài 2 dựng đúng pipeline trên bằng LangChain, với cấu trúc
-thư mục mà nhìn vào là thấy từng khối. Bài 3 đi vào những chỗ hệ thống RAG hay hỏng và các kỹ
-thuật nâng cao cho từng khối, cùng cách đánh giá bằng RAGAS. Bài 4 là LangGraph và agent, bài 5
-là MCP, bài 6 là harness engineering.
+## 8. Điều RAG "trên giấy" chưa giải quyết được
 
 > Nếu chỉ nhớ một điều: LLM có hai nguồn thông tin, tham số và prompt. Tham số thì bạn không
 > kiểm soát được. RAG là kỷ luật đưa đúng thứ vào prompt.
+
+Bài này cố tình không dùng framework nào, để bạn thấy RAG chỉ là: chuẩn bị sách, lật đúng trang,
+bắt mô hình đọc trang đó rồi mới trả lời. Ý tưởng đơn giản vậy, nhưng khi bắt tay vào làm thật,
+bạn sẽ thấy nó là một đống mảnh rời phải dán lại với nhau: đọc file, cắt chunk, gọi embedding
+model, ghi vào vector store, gọi LLM. Mỗi nhà cung cấp lại có một cách gọi riêng cho từng mảnh.
+Muốn đổi embedding model hay đổi vector store là phải viết lại mớ code dán ở giữa, và pipeline
+nhanh chóng thành một mớ khó đọc, khó thay. Đó chính là chỗ LangChain xuất hiện: cho mỗi mảnh
+một "hình dạng" chuẩn để chúng lắp vào nhau và thay được.
+[Bài 2](#/blog/langchain-rag-from-scratch) bắt đầu từ đúng chỗ này và dựng lại pipeline trên
+bằng LangChain, với cấu trúc thư mục mà nhìn vào là thấy từng khối.

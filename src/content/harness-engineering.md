@@ -7,11 +7,12 @@ summary: "Why a strong LLM still fails long tasks, what a harness is made of, an
 
 # Harness engineering: an agent is an LLM plus a harness
 
-The last four posts went from RAG to LangChain, LangGraph and MCP. By now you know how to give a
-model documents, let it call tools, branch on state, and plug tools in through a shared protocol.
-This final post answers the question that is left: why an agent built from all those parts still
-fails when it has to run for a long time, and what turns "an LLM that can call tools" into "a
-system that finishes the job".
+In [post 5](#/blog/mcp-model-context-protocol) we gave the agent one standard plug for every tool:
+MCP. At this point the model is smart and has the right tools in hand. Yet hand it a job of a few
+dozen steps and you will still watch it drift: it forgets what it already did, repeats old mistakes,
+says "done" too early, or does things it was not allowed to do. What fixes that is not a smarter
+model but the environment built around the model. This last post is about that environment: the
+harness.
 
 ## Same model, very different outcomes
 
@@ -36,8 +37,33 @@ model last.
 
 ## Agent = LLM + harness
 
-The formula is short enough to pass for a slogan, so let us be precise about where it comes from.
-The term *harness engineering* was used by Mitchell Hashimoto in
+Put plainly: the model is the brain. It reads, thinks, and decides the next step. But a brain on its
+own does not finish a long job. It needs a description of the work, a desk with tools, a notebook of
+what has been done, a few rules about what is and is not allowed, and someone who checks the result
+before it may say "done". All of that "around the brain" is the harness. An agent is the brain plus
+everything around it.
+
+Picture this. You hire a brilliant engineer. On day one you say "add search" and walk into a
+meeting. No documentation, nobody tells them how to run the tests, nobody explains the team's
+conventions, nobody reviews. They are still brilliant, but they will guess the requirement wrong,
+pick the wrong library, and confidently report done because nothing lets them check. The same person
+with a clear brief, a machine that is already set up, a checklist of what "done" means, just enough
+access, and an independent reviewer ships something usable. The person did not change; everything
+around the person did. An agent is exactly the same, only worse off: a new hire can at least ask a
+colleague, while the agent sees only the files you put in front of it and the commands you let it
+run. The course uses exactly this image in
+[lecture 02](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-02-what-a-harness-actually-is/index.md).
+
+So what does the harness do for the agent? It lets the brain work on a long job without drifting:
+it knows where it is after its short-term memory fills up, it does not repeat a mistake it already
+made, it does not quietly widen the job, it does not do what is forbidden, and it may not say "done"
+until there is proof. The harness does not make the model one bit smarter. It makes that
+intelligence produce results you can trust.
+
+### Where the formula comes from
+
+The formula is short enough to pass for a slogan, so let us be precise about its source. The term
+*harness engineering* was used by Mitchell Hashimoto in
 [My AI adoption journey](https://mitchellh.com/writing/my-ai-adoption-journey) (February 2026) with
 a very practical definition: whenever an agent makes a mistake, you take the time to engineer a
 fix so it *never* makes that mistake again, through instructions in `AGENTS.md` or through real
@@ -52,25 +78,13 @@ and back in late 2024 described agents in
 "LLMs using tools based on environmental feedback in a loop". That loop and that environment *are*
 the harness; it just had no name yet.
 
-So what is a harness, in plain words? If the model is the *brain*, the harness is everything else
-the brain needs to get work done: the loop that calls the model and then runs its tools, the tools
-and their descriptions, context management (what the model gets to see at each step), memory and
-state outside the context, the runtime environment (sandbox, limits), permissions and guardrails
-(what it may and may not do), verification and feedback (how we know it is right), observability
-(traces, logs, evals) and recovery (what happens after a failure).
+In more technical terms, the harness holds: the loop that calls the model and then runs its tools,
+the tools and their descriptions, context management (what the model gets to see at each step),
+memory and state outside the context, the runtime environment (sandbox, limits), permissions and
+guardrails (what it may and may not do), verification and feedback (how we know it is right),
+observability (traces, logs, evals) and recovery (what happens after a failure).
 
-A familiar picture: you hire a brilliant engineer. On day one you say "add search" and walk into a
-meeting. No README, no one tells them how to run the tests, no one explains the team's conventions,
-no one reviews. They are still brilliant, but they will guess the requirement wrong, pick the wrong
-library, and confidently report done because nothing lets them check. The same person with a clear
-brief, a machine that is already set up, a checklist of what "done" means, just enough access, and
-an independent reviewer ships something usable. The course uses exactly this image in
-[lecture 02](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-02-what-a-harness-actually-is/index.md),
-and adds a point that matters: an agent is worse off than a new hire, because the new hire can at
-least ask a colleague. The agent sees only the files you put in front of it and the commands you
-let it run.
-
-![Agent = LLM + harness: the model in the centre, nine harness components around it, connected by the loop that calls the model and runs tools](blog/harness-engineering-agent-anatomy.svg)
+![Agent = LLM + harness: the model in the centre, eight harness components around it, connected by the loop that calls the model and runs tools](blog/harness-engineering-agent-anatomy.svg)
 
 What does the harness give the agent? Five things, each matching a typical failure:
 
@@ -110,6 +124,10 @@ long-running research agents die most often.
 
 ### Instructions: a map, not an encyclopedia
 
+Put simply, this is the sheet of paper you leave on a new hire's desk on day one: what the job is,
+what done looks like, how the team does things. Without that sheet the agent does not fail because it
+is weak; it fails because it has to guess.
+
 Holds: the system prompt, the instruction file at the repo root (`AGENTS.md` or `CLAUDE.md`), and a
 *definition of done* that a command can check. Prevents: the two top failures in the course's
 lecture 01, vague requirements (the agent can only guess) and unwritten conventions (the agent
@@ -123,8 +141,12 @@ the model handle the situation, no brittle hardcoded logic.
 
 ### Tools: a contract between deterministic systems and a non-deterministic agent
 
+This is the toolbox on the desk. A good mechanic with no screwdriver can only watch; a jumbled box
+with no labels means grabbing the wrong tool. Tools need clear names and descriptions, like labels on
+each instrument.
+
 Holds: the tools, their descriptions, their parameter schemas, and how they are exposed (possibly
-over MCP, as in post 5). Prevents: the agent having no way to act, or so many overlapping tools
+over MCP, as in [post 5](#/blog/mcp-model-context-protocol)). Prevents: the agent having no way to act, or so many overlapping tools
 that it picks the wrong one. Anthropic's
 [Writing effective tools for agents](https://www.anthropic.com/engineering/writing-tools-for-agents)
 defines a tool as "a contract between deterministic systems and non-deterministic agents" and
@@ -137,6 +159,9 @@ either.
 
 ### Environment: self-describing surroundings
 
+This is the workshop: is the power on, is the software the right version, which doors are open. A
+broken workshop means the mechanic spends the day fixing the workshop instead of doing the job.
+
 Holds: where the agent runs, runtime versions, locked dependencies, sample data, and limits
 (network, time, memory). Prevents: the agent burning its context window on failed `pip install`
 and version conflicts instead of the real task. Example from lecture 06: make *initialization* its
@@ -146,6 +171,10 @@ means an allow-list of fetchable domains and a size cap per page, so a hostile w
 become a prompt injection that hijacks the agent.
 
 ### Context: a finite resource with diminishing returns
+
+Context is what the model can "see" right now, like a desk with limited surface. Pile papers on it
+and the important sheet gets buried. The harness has to clear the desk: file old papers away in a
+cabinet and leave out only what is needed next.
 
 Holds: the policy for *what sits in the context window at each step*. Prevents: *context rot*, the
 model recalling less as the context grows, and the agent "running out of breath" mid-task.
@@ -160,6 +189,10 @@ summaries last, with circuit breakers against over-compaction.
 
 ### State: memory that lives outside the context
 
+If context is the desk, state is the notebook and the cabinet: what was done, what is in progress,
+what is left, written down outside so the next shift can open it. Without the notebook, every new
+shift starts as if there had been no shift before.
+
 Holds: a progress file, a task list with states, git history, a handoff note. Prevents: losing
 continuity between sessions, redoing finished work, or "looking around, seeing progress, and
 declaring the whole project done" (a failure Anthropic records verbatim). Anthropic's example: an
@@ -172,6 +205,9 @@ command succeeds, executed by the harness, not written by the agent.
 
 ### Scope: one thing at a time
 
+This is the "one thing at a time" rule. Anyone who has had five tasks open at once knows how it
+ends: all of them half-done. An agent is exactly the same, it just gets there faster.
+
 Holds: a limit on open work (WIP, work in progress) and the boundary of each task, written to a
 file. Prevents: the twin failures lecture 07 calls *overreach* and *under-finish*. Example:
 Anthropic asked its coding agent to work on one feature per session and found this critical against
@@ -180,6 +216,9 @@ unconstrained mode left three half-done; WIP=1 finished seven after four session
 completion rate were negatively correlated.
 
 ### Verification: confidence is not correctness
+
+This is the examiner, separate from the student. Grade your own paper and you will find yourself
+right; so does an agent. "Done" has to be proven by a test that actually runs, not by a feeling.
 
 Holds: verification commands, automatic checkers, and an evaluator *separate from* the maker.
 Prevents: the most common failure of all, *declaring victory early*. Lecture 09 calls it the
@@ -192,6 +231,9 @@ split out an evaluator with hard thresholds per criterion. Lecture 13 of the cou
 a principle: *the maker and the checker must be separate*, sometimes two different models.
 
 ### Observability: you cannot fix what you cannot see
+
+This is the workshop's camera and logbook: who did what and when, what it cost, how it turned out.
+Without it, when something breaks all you know is "it broke", not where to fix it.
 
 Holds: a trace of every step (which tool, which input, how many tokens), runtime logs, scoring
 rubrics, and an eval suite. Prevents: blind retries, gut-feeling evaluation, and handoffs that lose
@@ -240,7 +282,7 @@ whole loop. The model decides *what to do next*; the harness decides *within whi
 
 The code below uses the Anthropic Python SDK 2.x (calling the Messages API directly, with a
 hand-written loop so every harness component is visible) and the MCP Python SDK 2.x for the tools.
-If you use LangGraph as in post 4, each box in the diagram becomes a node and the graph state
+If you use LangGraph as in [post 4](#/blog/langgraph-ai-agents), each box in the diagram becomes a node and the graph state
 replaces `progress.json`; the harness components stay the same, they just move house.
 
 ```text
@@ -450,7 +492,7 @@ SEARCH = ToolSpec(
 ```
 
 `ToolSpec` carries the two flags `read_only` and `network` so `policy.py` can decide without knowing
-each tool; that is the same idea as MCP's tool *annotations* from post 5. If another agent should
+each tool; that is the same idea as MCP's tool *annotations* from [post 5](#/blog/mcp-model-context-protocol). If another agent should
 reuse this tool set, `tools/mcp_server.py` only has to wrap it:
 
 ```python
@@ -596,7 +638,7 @@ in a row all succeed is only about 42%.
 Every component above has a price: code to maintain, tokens for summaries, money for an evaluator,
 wall-clock time. Anthropic's full harness cost 20 times the bare call. So:
 
-- A question answered by one search and one model call needs no agent, let alone a harness; the RAG from post 1 is enough.
+- A question answered by one search and one model call needs no agent, let alone a harness; the RAG from [post 1](#/blog/rag-fundamentals) is enough.
 - Work with a fixed path (search, summarize, translate) should be a code-controlled workflow, which Anthropic distinguishes from an agent; verifiers and traces still help, but drop the open loop.
 - Start with the three cheapest, highest-return pieces: a definition of done a command can check, one code verifier, and one progress file. Both the course and Anthropic rank verification feedback as the highest-ROI component.
 - Add a component only when a *real failure* demands it, and measure with evals before and after. Remove a component when a new model makes it redundant.
@@ -606,10 +648,19 @@ wall-clock time. Anthropic's full harness cost 20 times the bare call. So:
 
 ## Closing the series
 
-The six posts are one path. RAG brings outside knowledge into the context. LangChain gives standard
-blocks to assemble a pipeline. LangGraph adds state and branches when the pipeline stops being a
-straight line. Agents give the model the right to choose its next step, and MCP gives it one way to
-talk to every tool. Harness engineering is the last layer: it turns all of that into a system that
-runs for a long time, verifies itself, leaves a trace, and can continue after a session dies. Models
-will keep getting stronger, and part of today's harness will become redundant; but the question
-"what can the model still not do by itself, and what structure makes up for it" stays.
+The six posts are one path, and each step fixes the weakness the previous one left behind. An LLM
+on its own does not know your data and will happily make things up; [post 1](#/blog/rag-fundamentals)
+brings in RAG so the model answers from real documents. But gluing the pieces of RAG together by
+hand is tedious and every vendor does it differently, so
+[post 2](#/blog/langchain-rag-from-scratch) uses LangChain to give every piece a standard shape that
+snaps in and swaps out. That RAG only looks good in a demo; [post 3](#/blog/rag-production-techniques)
+tunes each stage so it survives real documents and real users, and can be measured. However well
+tuned, RAG is still a one-way street, one lookup and one answer;
+[post 4](#/blog/langgraph-ai-agents) adds loops, branches and shared memory with LangGraph, then lets
+the model choose its own next step, which is what makes it an agent. An agent is only as useful as
+its tools, and every tool is another API wired up by hand;
+[post 5](#/blog/mcp-model-context-protocol) brings in MCP as the one shared plug. And once the model
+is smart and the tools are all there, long jobs still drift; this post builds the harness around the
+model so it runs for a long time, verifies itself, leaves a trace, and can continue after a session
+dies. Models will keep getting stronger, and part of today's harness will become redundant; but the
+question "what can the model still not do by itself, and what structure makes up for it" stays.

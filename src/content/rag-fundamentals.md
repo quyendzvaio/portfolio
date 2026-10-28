@@ -15,23 +15,30 @@ grow it into agents.
 
 ## 1. Where LLMs are strong, and where they are inherently weak
 
-Before the weaknesses, you need to see how an LLM (large language model) is made and how it
-produces text, because every weakness below follows from that.
+Before the weaknesses, you need to see how an LLM (large language model, the "brain" behind
+ChatGPT, Claude or Gemini) is made and how it produces text, because every weakness below
+follows from that.
 
 ### How an LLM is trained and how it generates text
 
-An LLM is a neural network with billions of parameters (the numbers inside the model that get
-adjusted during training). It is trained on an enormous pile of text collected **up to a fixed
-point in time**, on exactly one exercise: look at the text so far, predict the next token (the
-unit of text the model works with, usually a word or a piece of a word). Doing that exercise
-trillions of times, the model compresses the regularities of language, and along with them a
-great many facts, into its parameters.
+Put simply, picture a person who has read almost everything ever written on the Internet, but
+only up to a certain day, and then stopped. After that, every book is locked away. What stays in
+their head is not the pages; it is a very good feel for which word tends to follow which, plus a
+huge number of facts remembered roughly. When you ask them something, they are not allowed to
+open a book; they just say the sentence that sounds most natural, from memory. That is an LLM.
 
-When you ask it something, the model does not look anything up. It takes the prompt (all the
-text you hand it), computes a probability for the next token, picks one, appends it, and repeats.
-The answer is a high-probability sequence of tokens, produced from what the parameters remember
-plus whatever is in the prompt. Those two sources are all the model has. Keep that sentence in
-mind, because RAG is entirely about the second source.
+Now the same thing in technical words, each explained once. The model is a calculating machine
+holding billions of numbers, called parameters or weights; training is the process of nudging
+those numbers again and again. Text is cut into small pieces called tokens, usually a word or a
+piece of a word. There is only one training exercise: look at the pieces so far, guess the next
+one. Doing that trillions of times over text collected **up to a fixed point in time**, the
+numbers gradually "compress" both the patterns of language and countless facts.
+
+When you ask it something, the model looks nothing up. It takes the prompt (the prompt is all
+the text you hand it, the question plus anything you attach), guesses the next piece of text,
+appends it, and repeats until the answer is done. The answer is woven from exactly two sources:
+what the numbers "remember", and what is in the prompt. Keep that sentence in mind, because RAG
+is entirely about the second source.
 
 Given that mechanism, the six weaknesses below are consequences, not bugs of any one vendor.
 
@@ -125,15 +132,22 @@ the prompt", and the second one can be controlled and measured.
 
 ## 3. The essence of RAG: an open-book exam instead of a closed-book one
 
-The whole idea of RAG fits in one sentence: **before asking, find the relevant passages from your
-documents and paste them into the prompt, so the model has what it needs right in front of it.**
+Picture this. You are sitting an exam. Closed book, you have only what you memorised; faced with
+a question on something you never studied, you either leave it blank or write something that
+sounds right. Open book, you are still you, but you may bring the material in, turn to the right
+page, and only then write. The answer is far more accurate, and you can even add "see page 12".
 
-Picture an exam. Closed book: you have only what you memorised; faced with a question on
-something you never studied, you either leave it blank or write something that sounds right.
-Open book: you are still you, but you may bring the material in and turn to the right page. The
-answer is more accurate, and you can write "see page 12". The key point: an open-book exam does
-not make you smarter, it makes you **better informed**. RAG does not make the LLM smarter
-either; it only guarantees the model gets to read the right page before answering.
+Notice one thing: an open-book exam does not make you smarter. It only makes you **better
+informed** at the moment you need it. RAG does exactly that for the model. In plain words, RAG
+is: before letting the model answer, go and find a few passages from your documents that talk
+about the thing being asked, put them right in front of the model together with the question,
+and tell it "answer from these". The model does not need to remember anything about your
+company; it only needs to be shown the right page.
+
+So the long name, Retrieval-Augmented Generation, is really three moves: go and find
+(retrieval), add it to the question (augmented), and only then write the answer (generation).
+Everything else in this post, chunks, embeddings, vector stores, rerankers, is just a way of
+making the "go and find" move fast and accurate.
 
 ![LLM alone is a closed-book exam: memory only, a fluent answer that may be outdated or invented; LLM plus retrieval is an open-book exam: the question goes through a retriever that pulls passages from your documents, they are placed in the prompt, and only then does the model generate a cited answer](blog/rag-fundamentals-open-book.svg)
 
@@ -204,7 +218,7 @@ pieces (chunks), usually a few hundred tokens. You must split for two reasons: t
 very long passage goes "blurry" (one vector cannot represent ten topics well), and at answer
 time you want to paste only the relevant passage, not the whole document. The simplest split is
 fixed size with overlap, so a sentence cut in half still appears whole in at least one chunk.
-Smarter splitting is covered in post 3.
+Smarter splitting is covered in [post 3](#/blog/rag-production-techniques).
 
 **Embed.** An embedding is a list of numbers (a vector) that captures the meaning of a text, so
 that two texts with similar meaning get nearby vectors. OpenAI's documentation puts it plainly:
@@ -376,14 +390,19 @@ And even when RAG is the right call, start with the most naive version: fixed-si
 embedding model, top-5, one clear prompt. Measure. Then add BM25, a reranker, query rewriting,
 one at a time, when the numbers say you need them.
 
-## 8. Next in the series
-
-This post deliberately has no framework, so you can see that RAG is just: prepare the book, open
-the right page, make the model read that page before it answers. Post 2 builds exactly this
-pipeline with LangChain, with a folder layout where each block is visible at a glance. Post 3
-covers where RAG systems break and the advanced techniques for each block, plus evaluation with
-RAGAS. Post 4 is LangGraph and agents, post 5 is MCP, post 6 is harness engineering.
+## 8. What RAG "on paper" still does not solve
 
 > If you remember one thing: an LLM has two sources of information, its parameters and its
 > prompt. You do not control the parameters. RAG is the discipline of putting the right thing in
 > the prompt.
+
+This post deliberately uses no framework, so you can see that RAG is just: prepare the book,
+open the right page, make the model read that page before it answers. The idea is that simple,
+but the moment you build it for real, you find it is a pile of separate pieces that have to be
+glued together: reading files, cutting chunks, calling an embedding model, writing to a vector
+store, calling the LLM. Every vendor has its own way of doing each piece. Swapping the embedding
+model or the vector store means rewriting the glue code in between, and the pipeline quickly
+turns into something hard to read and hard to change. That is exactly where LangChain comes in:
+it gives every piece a standard shape so they snap together and can be swapped.
+[Post 2](#/blog/langchain-rag-from-scratch) starts from precisely this point and rebuilds the
+pipeline above with LangChain, with a folder layout where each block is visible at a glance.

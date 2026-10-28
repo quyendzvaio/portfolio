@@ -7,12 +7,15 @@ summary: "What problem LangChain solves, how each component serves RAG and agent
 
 # What LangChain Is, and Building RAG From Scratch With It
 
-Post 1 of this series explained why LLMs need RAG: a model only knows what it was trained on,
-so we retrieve the relevant passages and put them into the context, and the model answers from
-evidence. This post answers the next question: *what do you write that with?* The first half
-explains what LangChain was built to solve and where each of its components sits in a RAG
-pipeline versus an agent. The second half builds a small RAG system that runs on your laptop,
-with a folder structure that shows the pipeline at a glance.
+In [post 1](#/blog/rag-fundamentals) we saw how RAG fixes the LLM's blind spot about your own
+data: find the right passage, put it in the context, and the model answers from evidence. The
+idea is simple. But the moment you start building it, you find that RAG is not one thing but
+five or six separate pieces that have to be glued together: reading files, cutting them up,
+embedding, a vector store, then the LLM. Every vendor does each piece its own way, so swapping
+one piece means rewriting the glue. This post is about the tool built to fix exactly that
+weakness: LangChain. The first half explains what problem LangChain solves and where each of
+its components sits in a RAG pipeline versus an agent. The second half builds a small RAG
+system that runs on your laptop, with a folder structure that shows the pipeline at a glance.
 
 Every API here was checked against **LangChain 1.x** at the time of writing (28 Oct 2026, per
 PyPI): `langchain` 1.4.7, `langchain-core` 1.7.1, `langgraph` 1.2.18,
@@ -23,12 +26,20 @@ runs.
 
 ## 1. What problem LangChain was built to solve
 
-Picture writing RAG with no framework. You need to: call a model provider's API (OpenAI,
-Anthropic, Google, or Ollama running locally), each with its own request and response format;
-read PDF, Markdown and HTML; cut text into pieces; call a separate embedding API; write vectors
-into a database; write a search function; assemble a prompt; parse the result. That is a lot
-of glue code. Then one day you want to swap GPT for Claude to compare, or move the vector store
-from Chroma to Postgres, and you discover the glue is welded to the old vendor.
+Here is the plain version. Imagine you bought appliances in five different countries, each
+with a different plug. To use them you have to build an adapter for every single one, and the
+day you swap one appliance for another, you build another adapter. LangChain is the standard
+socket: every piece of RAG is shaped to the same plug, so anything fits, and you can pull one
+piece out and put another in without touching the rest. Put differently, it turns the pile of
+loose parts from [post 1](#/blog/rag-fundamentals) into Lego bricks that click together.
+
+More concretely, what happens if you write RAG with no framework? You need to: call a model
+provider's API (OpenAI, Anthropic, Google, or Ollama running locally), each with its own
+request and response format; read PDF, Markdown and HTML; cut text into pieces; call a
+separate embedding API; write vectors into a database; write a search function; assemble a
+prompt; parse the result. That is a lot of glue code. Then one day you want to swap GPT for
+Claude to compare, or move the vector store from Chroma to Postgres, and you discover the glue
+is welded to the old vendor.
 
 LangChain states its goal in its
 [design philosophy page](https://docs.langchain.com/oss/python/langchain/philosophy):
@@ -165,7 +176,7 @@ metadata, which is handy for stable ids. There is also `MarkdownHeaderTextSplitt
 headings, keep the heading as metadata) and `CharacterTextSplitter.from_tiktoken_encoder`
 (count tokens instead of characters).
 
-- **In RAG:** decides retrieval quality more than anything else; post 3 goes deep on it.
+- **In RAG:** decides retrieval quality more than anything else; [post 3](#/blog/rag-production-techniques) goes deep on it.
 - **In an agent:** no role at run time, unless the agent indexes new documents itself.
 
 ### Embeddings
@@ -269,7 +280,7 @@ The defining feature of `create_agent` is **middleware**: hooks such as `before_
 `after_model` and `wrap_tool_call` for summarising history, redacting PII, or requiring human
 approval before a sensitive tool. When your flow does not fit "one model-tool loop" (several
 agents, predetermined branches, a human in the middle), you drop down to LangGraph and draw
-the graph yourself. Post 4 of the series is about exactly that.
+the graph yourself. [Post 4](#/blog/langgraph-ai-agents) of the series is about exactly that.
 
 ### Memory and chat history
 
@@ -851,6 +862,10 @@ but the retriever becomes a tool, the chain becomes a loop, and the loop runs on
 The `docs-rag` codebase puts each piece in one file and each stage in one folder, so reading
 the tree is reading the pipeline.
 
-The next post is about where this system breaks on real data: chunks cut in the wrong place,
-the retriever fetching the wrong passage, answers that "sound right", and the techniques that
-fix each one, together with how to measure whether a fix is needed at all.
+But let's be honest: the `docs-rag` we just built is the "naive" version of RAG. It looks
+great in a demo; with real documents and real users it starts pulling the wrong passages,
+misreading vague questions, getting slower, costing more than planned, and nobody can measure
+whether it is good or bad. LangChain gives you standard pieces, but it does not tell you which
+piece is failing. [Post 3](#/blog/rag-production-techniques) starts from exactly there: it
+walks through each stage of this pipeline, shows how it breaks, which technique fixes it, and
+what to measure to know whether a fix is needed at all.

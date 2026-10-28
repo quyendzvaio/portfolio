@@ -7,10 +7,13 @@ summary: "Vì sao LLM vất vả với API truyền thống, MCP giải quyết 
 
 # MCP: một giao thức chung giữa agent và tool
 
-Ở bài 4, agent hỗ trợ khách hàng của cửa hàng online được dựng bằng LangGraph có bốn tool:
-tra cứu đơn hàng, hoàn tiền, tạo ticket trong CRM và gửi email. Bài đó nói các tool "nằm sau
-MCP server" rồi đi tiếp. Bài này mở cái hộp đó ra: MCP là gì, vì sao cần nó, bên trong có
-những gì, và viết một server thật bằng Python thì trông ra sao.
+Ở [bài 4](#/blog/langgraph-ai-agents), mình đã dựng một agent hỗ trợ khách hàng bằng
+LangGraph: nó tự chọn bước tiếp theo, biết rẽ nhánh, biết dừng chờ người duyệt. Nhưng agent
+đó chỉ giỏi được bằng đúng những tool nó có trong tay: tra cứu đơn hàng, hoàn tiền, tạo ticket
+CRM, gửi email. Và mỗi tool là một API khác nhau mà ai đó phải tự tay nối vào, viết riêng cho
+từng ứng dụng. Bài 4 chỉ nói các tool "nằm sau MCP server" rồi đi tiếp. Bài này mở cái hộp đó
+ra: MCP là gì, vì sao nó sửa được đúng điểm yếu ấy, bên trong có gì, và một server thật viết
+bằng Python trông ra sao.
 
 Mọi chi tiết giao thức trong bài được đối chiếu với bản spec hiện hành tại
 [modelcontextprotocol.io](https://modelcontextprotocol.io/specification/latest), revision
@@ -76,25 +79,38 @@ mớ tích hợp rời rạc bằng một giao thức mở duy nhất, giống n
 
 ## 2. MCP giải quyết bằng cách nào
 
-MCP (Model Context Protocol) là một giao thức mở, dựa trên JSON-RPC 2.0, chuẩn hoá cách một
-ứng dụng AI kết nối tới các nguồn ngữ cảnh và tool. Nó không quy định bạn dùng model nào hay
-quản lý context ra sao; nó chỉ quy định hai bên nói chuyện với nhau bằng những message gì.
+Nói nôm na, MCP là một chuẩn ổ cắm. Hình dung thế này: ngày trước mỗi hãng điện thoại một
+kiểu sạc, đổi máy là đổi sạc. Rồi USB-C ra đời: máy nào cũng cắm được sạc nào, miễn hai bên
+cùng theo một chuẩn. MCP làm đúng việc đó cho AI. Một bên là ứng dụng AI (agent, chatbot,
+editor), bên kia là tool và dữ liệu (đơn hàng, CRM, file). Thay vì mỗi cặp tự nối dây riêng,
+cả hai cùng cắm vào một chuẩn chung: tool chỉ cần "nói MCP" một lần là mọi ứng dụng dùng
+được, ứng dụng chỉ cần "nói MCP" một lần là gọi được mọi tool.
+
+Cho ai muốn câu chữ chính xác: MCP (Model Context Protocol) là một giao thức mở, dựa trên
+JSON-RPC 2.0 (một định dạng gọi hàm từ xa bằng JSON), chuẩn hoá cách ứng dụng AI kết nối tới
+các nguồn ngữ cảnh và tool. Nó không quy định bạn dùng model nào hay quản lý context ra sao;
+nó chỉ quy định hai bên nói chuyện với nhau bằng những message gì.
 
 ### 2.1 Các thành phần và vai trò của từng thành phần
 
-Spec định nghĩa ba bên tham gia:
+Hình dung ứng dụng AI của bạn là một văn phòng, còn mỗi hệ thống bên ngoài (kho đơn hàng,
+CRM, email) là một nhà cung cấp. Spec định nghĩa ba bên tham gia:
 
-- **Host**: ứng dụng AI, nơi chứa LLM và vòng lặp agent. Claude Desktop, VS Code, hay agent hỗ trợ khách hàng của chúng ta đều là host. Host quyết định kết nối tới server nào, hỏi người dùng khi cần, và gom ngữ cảnh từ nhiều nơi cho model.
-- **Client**: một đối tượng do host tạo ra, giữ một kết nối tới đúng một server. Host nối bốn server thì có bốn client. Client lo việc giao thức: gắn metadata vào mỗi request, định tuyến message, quản lý subscription.
-- **Server**: chương trình cung cấp ngữ cảnh và khả năng cho client. Server có thể là một tiến trình trên cùng máy, hoặc một dịch vụ ở xa. Nó bọc hệ thống thật (Orders DB, CRM) và chỉ lộ ra những gì cần cho model.
+- **Host** nói nôm na là cái văn phòng: nơi "nhân viên" LLM ngồi làm, và sếp (vòng lặp agent) quyết định việc gì được làm, việc gì phải hỏi ý người dùng. Claude Desktop, VS Code hay agent hỗ trợ khách hàng của chúng ta đều là host. Host chọn kết nối tới server nào, hỏi người dùng khi cần, và gom ngữ cảnh từ nhiều nơi cho model.
+- **Client** là đường dây điện thoại riêng từ văn phòng tới đúng một nhà cung cấp; nối bốn nhà cung cấp thì có bốn đường dây. Về kỹ thuật, client là đối tượng do host tạo ra, giữ một kết nối tới đúng một server, và lo phần giao thức: gắn metadata vào mỗi request, định tuyến message, quản lý subscription.
+- **Server** là quầy tiếp tân của nhà cung cấp: nó đứng chắn trước hệ thống thật (Orders DB, CRM) và chỉ đưa ra những gì khách được phép thấy. Server có thể là một tiến trình chạy cùng máy, hoặc một dịch vụ ở xa.
 
-Server cung cấp ba loại "primitive" (khối cơ bản): **tools** (hàm để model gọi), **resources**
-(dữ liệu để đọc, định danh bằng URI) và **prompts** (mẫu hội thoại có tham số). Client cung
-cấp ngược lại **elicitation** (server xin thêm thông tin từ người dùng), cùng hai primitive
-đã bị đánh dấu deprecated trong revision 2026-07-28 là **sampling** và **roots**.
+Mỗi quầy tiếp tân đưa ra ba thứ, spec gọi là ba "primitive" (khối cơ bản). **Tools** là thực
+đơn: danh sách việc bạn có thể gọi làm, mỗi món có tên, mô tả và những gì cần điền. **Resources**
+là tờ rơi để sẵn trên quầy: dữ liệu chỉ để đọc, như chính sách hoàn tiền, mỗi tờ có một địa
+chỉ riêng (URI). **Prompts** là mẫu đơn viết sẵn: đoạn hội thoại có chỗ trống để điền, như
+"phân loại ticket này". Chiều ngược lại, client cung cấp **elicitation** (quầy hỏi ngược khách
+một thông tin còn thiếu), cùng hai primitive đã bị đánh dấu deprecated trong revision
+2026-07-28 là **sampling** và **roots**.
 
-Ở giữa là **transport**, cách byte đi từ client tới server: `stdio` cho server chạy cùng máy,
-Streamable HTTP cho server ở xa.
+**Transport** là cách lời nhắn đi lại giữa văn phòng và quầy: nói trực tiếp khi ở cùng một
+toà nhà (`stdio`, server chạy cùng máy) hay gọi qua mạng khi ở xa (Streamable HTTP). Nội dung
+lời nhắn giống hệt nhau, chỉ khác đường đi.
 
 ![Kiến trúc MCP: host chứa LLM và ba client; mỗi client nối tới một server qua stdio hoặc Streamable HTTP; mỗi server bọc một hệ thống thật](blog/mcp-model-context-protocol-architecture.svg)
 
@@ -138,9 +154,8 @@ Nếu bạn đọc tài liệu hay blog từ 2025, bạn sẽ thấy phiên kế
 và capability một lần. Revision 2026-07-28 bỏ handshake này: MCP trở thành giao thức
 **stateless** (không trạng thái), mỗi request tự mang phiên bản giao thức và capability của
 client trong trường `_meta`. `server/discover` thay thế vai trò "hỏi server có gì" của
-`initialize`. Các server dùng revision 2025-11-25 trở về trước vẫn chạy handshake cũ, và SDK
-chính thức phục vụ cả hai kiểu client cùng lúc. Trong bài này tôi trình bày theo bản hiện
-hành và chỉ nhắc bản cũ ở chỗ cần.
+`initialize`. Trong bài này tôi trình bày theo bản hiện hành và chỉ nhắc bản cũ ở chỗ
+cần.
 
 ## 3. Cấu trúc chi tiết từng thành phần
 
@@ -697,7 +712,7 @@ server.
 
 ### 4.4 Gắn vào agent LangGraph của bài 4
 
-Agent ở bài 4 là host. Nó cần một client cho mỗi server, lấy định nghĩa tool, chuyển thành
+Agent ở [bài 4](#/blog/langgraph-ai-agents) là host. Nó cần một client cho mỗi server, lấy định nghĩa tool, chuyển thành
 tool của LangChain, và khi model gọi thì chuyển tiếp `tools/call`. LangChain 1.x cung cấp sẵn
 adapter này trong `langchain.mcp` (cài `langchain[mcp]`, bản từ 1.4.0, hiện là beta, và gói
 `langchain-mcp-adapters` cũ đã lưu trữ):
@@ -714,7 +729,7 @@ async def build_agent(model):
         return create_agent(model, tools)       # host: vòng lặp agent + tool calling
 ```
 
-Phần MCP *không* làm thay bạn là consent. Trong graph của bài 4, nút gọi tool hoàn tiền phải
+Phần MCP *không* làm thay bạn là consent. Trong graph của [bài 4](#/blog/langgraph-ai-agents), nút gọi tool hoàn tiền phải
 đi qua một nút "chờ người duyệt" (interrupt của LangGraph) trước khi `tools/call` được gửi.
 `destructiveHint` của tool là tín hiệu để host biết tool nào cần nút đó.
 
@@ -723,7 +738,7 @@ Phần MCP *không* làm thay bạn là consent. Trong graph của bài 4, nút 
 MCP thêm một tiến trình (hoặc một dịch vụ), một lớp serialize, và với HTTP là cả OAuth. Đó là
 chi phí thật, và không phải lúc nào cũng đáng.
 
-- **Một ứng dụng, vài tool nội bộ, một đội duy trì.** Hàm Python gắn thẳng vào agent đơn giản hơn, debug dễ hơn, nhanh hơn. Bài 4 có thể chạy hoàn toàn không có MCP.
+- **Một ứng dụng, vài tool nội bộ, một đội duy trì.** Hàm Python gắn thẳng vào agent đơn giản hơn, debug dễ hơn, nhanh hơn. [Bài 4](#/blog/langgraph-ai-agents) có thể chạy hoàn toàn không có MCP.
 - **Tool không bao giờ được tái sử dụng.** Lợi ích N x M chỉ xuất hiện khi N hoặc M lớn hơn 1.
 - **Độ trễ là yêu cầu cứng.** Mỗi lần gọi qua stdio hay HTTP thêm vài mili giây tới vài chục; với vòng lặp agent gọi 20 tool thì đáng kể.
 
@@ -745,8 +760,11 @@ nạp tool khi cần, thay vì đổ hết lên mọi lượt gọi.
 - Bảo mật không nằm trong giao thức mà nằm ở host: coi mô tả và kết quả tool là không đáng tin, ít quyền nhất, con người duyệt thao tác phá huỷ.
 - Python SDK 2.x: `MCPServer` cho server, `Client` cho client; type hint thành schema; `mcp dev` để thử.
 
-Bài 6 sẽ bàn về harness: những thứ bao quanh LLM để nó dùng tool một cách đáng tin cậy, và
-MCP chính là một mảnh của harness đó.
+Đến đây agent của bài 4 đã có một ổ cắm chuẩn cho mọi tool. Nhưng một model thông minh với
+đầy đủ tool trong tay vẫn "trôi" khi làm việc dài: quên mình đã làm gì, lặp lại lỗi cũ, báo
+"xong" quá sớm, làm cả việc không được phép. Thứ sửa được điều đó không phải một model thông
+minh hơn, mà là môi trường dựng quanh nó. [Bài 6](#/blog/harness-engineering) bắt đầu từ đó:
+harness engineering, và MCP chỉ là một mảnh trong cái harness ấy.
 
 Nguồn tham khảo: [MCP specification 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28),
 [Key changes 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/changelog),

@@ -7,10 +7,11 @@ summary: "Vì sao một LLM giỏi vẫn làm hỏng việc dài hơi, harness g
 
 # Harness engineering: Agent = LLM + harness
 
-Bốn bài trước đi từ RAG, LangChain, LangGraph đến MCP. Đến đây bạn đã biết cách cho model
-đọc tài liệu, gọi tool, rẽ nhánh theo state và nối tool qua một giao thức chung. Bài cuối này
-trả lời câu hỏi còn lại: vì sao một agent được lắp đủ các mảnh đó vẫn hay thất bại khi phải chạy
-dài hơi, và cái gì biến "một LLM biết gọi tool" thành "một hệ thống làm xong việc".
+Ở [bài 5](#/blog/mcp-model-context-protocol) mình đã cho agent một ổ cắm chuẩn để nối với mọi
+tool: MCP. Đến đây model đã thông minh, tool đã đủ trong tay. Vậy mà giao cho nó một việc dài vài
+chục bước, bạn vẫn sẽ thấy nó trôi dần: quên mất mình đã làm gì, lặp lại lỗi cũ, báo "xong" quá sớm,
+hoặc làm cả những việc không được phép. Thứ sửa được chuyện này không phải một model thông minh hơn,
+mà là môi trường dựng quanh model. Bài cuối này nói về môi trường đó: harness.
 
 ## Cùng một model, hai kết quả khác hẳn
 
@@ -33,8 +34,31 @@ walkinglabs mở đầu bằng đúng lời khuyên ngược lại: khi hỏng, 
 
 ## Agent = LLM + harness
 
-Công thức này ngắn đến mức dễ bị coi là khẩu hiệu, nên nói rõ nó từ đâu ra. Thuật ngữ *harness
-engineering* được Mitchell Hashimoto dùng trong bài
+Nói nôm na thế này. Model là bộ não: nó đọc, suy nghĩ và quyết định bước tiếp theo. Nhưng một bộ
+não đứng một mình không làm xong được một việc dài. Nó cần một bản mô tả việc cần làm, một cái bàn
+với dụng cụ, một cuốn sổ ghi lại những gì đã làm, vài quy tắc về điều được và không được làm, và một
+người kiểm tra lại trước khi được nói "xong". Toàn bộ phần "xung quanh bộ não" ấy gọi là harness.
+Agent là bộ não cộng với phần xung quanh đó.
+
+Hình dung thế này. Bạn tuyển được một kỹ sư rất giỏi. Ngày đầu, bạn ném cho họ một câu "làm tính
+năng tìm kiếm nhé" rồi đi họp. Không tài liệu, không ai nói cách chạy thử, không ai nói quy ước của
+team, không ai review. Người đó vẫn giỏi, nhưng sẽ đoán sai yêu cầu, dùng nhầm thư viện, và tự tin
+báo xong vì không có gì để tự kiểm. Cũng người đó, với một bản brief rõ, một máy đã cài sẵn, một
+checklist "xong là thế nào", quyền truy cập vừa đủ, và một người review độc lập, sẽ làm ra sản phẩm
+dùng được. Người không đổi; thứ đổi là mọi thứ quanh người đó. Agent cũng y như vậy, và còn khó hơn:
+người mới ít nhất còn hỏi được đồng nghiệp, agent chỉ thấy đúng những file bạn đưa và những lệnh bạn
+cho chạy. Khoá học dùng đúng hình ảnh này ở
+[bài 02](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-02-what-a-harness-actually-is/index.md).
+
+Vậy harness giúp gì cho agent? Nó giúp bộ não làm việc dài mà không trôi: biết mình đang ở đâu sau
+khi "trí nhớ ngắn hạn" đầy, không lặp lại lỗi đã mắc, không tự ý mở rộng việc, không làm điều bị
+cấm, và không được nói "xong" cho đến khi có bằng chứng. Harness không làm model thông minh thêm
+chút nào. Nó làm cho sự thông minh đó cho ra kết quả đáng tin.
+
+### Công thức này từ đâu ra
+
+Công thức ngắn đến mức dễ bị coi là khẩu hiệu, nên nói rõ nguồn. Thuật ngữ *harness engineering*
+được Mitchell Hashimoto dùng trong bài
 [My AI adoption journey](https://mitchellh.com/writing/my-ai-adoption-journey) (tháng 2/2026) với
 định nghĩa rất thực dụng: mỗi lần agent mắc lỗi, bạn bỏ công kỹ thuật hoá một giải pháp để nó
 *không bao giờ* mắc lại lỗi đó, bằng chỉ dẫn trong `AGENTS.md` hoặc bằng tool viết hẳn hoi. Công
@@ -49,23 +73,13 @@ và từ cuối 2024 đã mô tả agent trong
 "LLM dùng tool dựa trên phản hồi từ môi trường, trong một vòng lặp". Vòng lặp và môi trường ấy
 chính là harness, chỉ chưa có tên.
 
-Vậy harness là gì, nói bằng lời thường? Nếu model là *bộ não* thì harness là toàn bộ phần còn lại
-để bộ não đó làm được việc: vòng lặp gọi model rồi chạy tool, bộ tool và mô tả của chúng, cách
-quản lý context (những gì model được nhìn thấy ở mỗi bước), bộ nhớ và state ngoài context,
-môi trường chạy (sandbox, giới hạn), quyền và guardrail (được làm gì, không được làm gì), kiểm
-chứng và phản hồi (sao biết là đúng), quan sát (trace, log, eval) và phục hồi (lỗi rồi làm gì tiếp).
+Nói bằng ngôn ngữ kỹ thuật hơn, harness gồm: vòng lặp gọi model rồi chạy tool, bộ tool và mô tả
+của chúng, cách quản lý context (những gì model được nhìn thấy ở mỗi bước), bộ nhớ và state ngoài
+context, môi trường chạy (sandbox, giới hạn), quyền và guardrail (được làm gì, không được làm gì),
+kiểm chứng và phản hồi (sao biết là đúng), quan sát (trace, log, eval) và phục hồi (lỗi rồi làm gì
+tiếp).
 
-Một ví dụ quen thuộc: bạn tuyển được một kỹ sư rất giỏi. Ngày đầu, bạn ném cho họ một câu "làm
-tính năng tìm kiếm nhé" rồi đi họp. Không README, không biết chạy test bằng lệnh gì, không ai nói
-convention của team, không ai review. Người đó vẫn giỏi, nhưng sẽ đoán sai yêu cầu, dùng nhầm
-thư viện, và tự tin báo xong vì không có gì để tự kiểm. Cũng người đó, với một bản brief rõ, một
-máy đã cài sẵn môi trường, một checklist "xong là thế nào", quyền truy cập vừa đủ, và một người
-review độc lập, sẽ làm ra sản phẩm dùng được. Khoá học dùng đúng hình ảnh này ở
-[bài 02](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-02-what-a-harness-actually-is/index.md),
-và thêm một điểm quan trọng: agent còn khó hơn người mới, vì người mới ít nhất còn hỏi được đồng
-nghiệp. Agent chỉ thấy đúng những file bạn đưa và những lệnh bạn cho chạy.
-
-![Sơ đồ Agent = LLM + harness: model ở giữa, chín thành phần harness bao quanh, vòng lặp gọi model và chạy tool nối chúng lại](blog/harness-engineering-agent-anatomy.svg)
+![Sơ đồ Agent = LLM + harness: model ở giữa, tám thành phần harness bao quanh, vòng lặp gọi model và chạy tool nối chúng lại](blog/harness-engineering-agent-anatomy.svg)
 
 Harness mang lại gì cho agent? Năm thứ, và chúng đối ứng với năm kiểu thất bại điển hình:
 
@@ -104,6 +118,9 @@ con độc lập, và vì nó là chỗ agent nghiên cứu dài hơi hay chết
 
 ### Instructions: bản đồ, không phải bách khoa
 
+Nói đơn giản, đây là tờ giấy bạn để trên bàn người mới ngày đầu: việc là gì, xong là thế nào, team
+làm theo lệ gì. Không có tờ giấy đó, agent làm sai không phải vì kém, mà vì phải đoán.
+
 Chứa: system prompt, file chỉ dẫn ở gốc repo (`AGENTS.md` hay `CLAUDE.md`), và một *định nghĩa
 xong* kiểm được bằng lệnh. Chặn: hai lỗi hàng đầu trong bài 01 của khoá học là yêu cầu mơ hồ (agent
 chỉ còn cách đoán) và convention không được viết ra (agent không thể tuân cái nó chưa từng thấy).
@@ -116,7 +133,10 @@ tự xử lý tình huống, không hardcode logic giòn.
 
 ### Tools: hợp đồng giữa hệ xác định và agent bất định
 
-Chứa: các tool, mô tả, schema tham số, và cách chúng được bày ra (có thể qua MCP, như bài 5).
+Đây là bộ dụng cụ trên bàn. Thợ giỏi mà không có tuốc-nơ-vít thì chỉ đứng nhìn; có cả thùng dụng
+cụ lẫn lộn không nhãn thì cầm nhầm. Tool cũng cần tên và mô tả rõ như nhãn trên từng dụng cụ.
+
+Chứa: các tool, mô tả, schema tham số, và cách chúng được bày ra (có thể qua MCP, như [bài 5](#/blog/mcp-model-context-protocol)).
 Chặn: agent không có cách làm việc, hoặc có quá nhiều tool chồng lấn nên chọn sai. Bài
 [Writing effective tools for agents](https://www.anthropic.com/engineering/writing-tools-for-agents)
 của Anthropic định nghĩa tool là "hợp đồng giữa hệ xác định và agent bất định", và rút ra vài quy
@@ -128,6 +148,9 @@ toàn" khiến agent không cài được gì, nhưng cũng không mở hết.
 
 ### Environment: môi trường tự mô tả
 
+Đây là cái xưởng: máy có điện chưa, phần mềm đúng phiên bản chưa, cửa nào được mở. Xưởng hỏng thì
+thợ mất cả buổi sửa xưởng thay vì làm việc được giao.
+
 Chứa: nơi agent chạy, phiên bản runtime, dependency bị khoá, dữ liệu mẫu, và giới hạn (mạng, thời
 gian, bộ nhớ). Chặn: agent đốt context window vào `pip install` lỗi và xung đột phiên bản thay vì
 làm việc chính. Ví dụ từ bài 06: tách *initialization* thành pha riêng với `init.sh` (cài, kiểm
@@ -136,6 +159,10 @@ bước tiếp. Với agent nghiên cứu, environment còn là allow-list domai
 cỡ trang, để một trang web độc không biến thành prompt injection chiếm quyền agent.
 
 ### Context: tài nguyên hữu hạn, lợi suất giảm dần
+
+Context là những gì model đang "nhìn thấy" lúc này, giống một cái bàn làm việc chỉ rộng có hạn.
+Chất đầy giấy lên bàn thì tờ quan trọng bị vùi mất. Harness phải dọn bàn: cất giấy cũ vào tủ, chỉ
+để lại thứ cần ngay.
 
 Chứa: chính sách về *cái gì nằm trong context window ở mỗi bước*. Chặn: *context rot*, hiện tượng
 model nhớ kém dần khi context dài ra, và chuyện agent "hết hơi" giữa việc. Anthropic coi context là
@@ -149,6 +176,9 @@ tóm tắt bằng LLM cuối cùng, có cầu chì chống nén quá tay.
 
 ### State: bộ nhớ sống ngoài context
 
+Nếu context là cái bàn thì state là cuốn sổ và cái tủ: đã làm gì, đang làm gì, còn gì, ghi ra ngoài
+để ca sau mở ra đọc. Không có sổ, mỗi ca làm việc mới bắt đầu như chưa từng có ca trước.
+
 Chứa: file tiến độ, danh sách việc có trạng thái, lịch sử git, tài liệu bàn giao. Chặn: mất liên
 tục giữa các phiên, làm lại việc đã xong, hoặc "nhìn quanh thấy có tiến độ rồi tuyên bố xong việc
 cả dự án" (một thất bại Anthropic ghi lại nguyên văn). Ví dụ từ Anthropic: một `init.sh`, một
@@ -160,6 +190,9 @@ lệnh kiểm chứng chạy qua, do harness thực hiện, không phải do age
 
 ### Scope: một việc một lúc
 
+Đây là quy tắc "một việc một lúc". Ai từng mở năm việc cùng lúc đều biết kết cục: cái nào cũng dở.
+Agent y hệt, chỉ khác là nó làm dở nhanh hơn.
+
 Chứa: giới hạn số việc đang mở (WIP, work in progress) và ranh giới của mỗi việc, ghi thành file.
 Chặn: cặp lỗi song sinh bài 07 gọi là *overreach* (làm quá) và *under-finish* (dang dở). Ví dụ:
 Anthropic yêu cầu coding agent chỉ làm một feature mỗi phiên và thấy đây là điểm mấu chốt chống xu
@@ -167,6 +200,9 @@ hướng "làm một phát hết cả app". Khoá học đo được: cùng tám
 làm dở; chế độ WIP=1 sau bốn phiên xong bảy. Dòng code và tỉ lệ hoàn thành tỉ lệ nghịch.
 
 ### Verification: tự tin không phải là đúng
+
+Đây là người chấm bài, tách khỏi người làm bài. Tự chấm bài mình thì ai cũng thấy mình đúng, agent
+cũng vậy. "Xong" phải được chứng minh bằng một bài kiểm tra chạy được, không phải bằng cảm giác.
 
 Chứa: lệnh kiểm chứng, checker tự động, và một evaluator *tách khỏi* người làm. Chặn: lỗi phổ
 biến nhất, *tuyên bố thắng sớm*. Bài 09 gọi đây là verification gap, khoảng cách giữa độ tự tin
@@ -178,6 +214,9 @@ cứng cho từng tiêu chí. Bài 13 của khoá học nâng điều này thàn
 tách nhau*, đôi khi là hai model khác nhau.
 
 ### Observability: không thấy thì không sửa
+
+Đây là camera và sổ nhật ký của xưởng: ai làm gì lúc nào, tốn bao nhiêu, kết quả ra sao. Không có
+nó, khi hỏng bạn chỉ biết "nó hỏng", không biết sửa chỗ nào.
 
 Chứa: trace từng bước (gọi tool gì, với input nào, tốn bao nhiêu token), log runtime, rubric chấm,
 và bộ eval. Chặn: retry mù, đánh giá cảm tính, và bàn giao mất thông tin. Bài 11 chia hai lớp:
@@ -221,7 +260,7 @@ nào*, và *khi nào được gọi là xong*.
 ### Cây thư mục: nhìn là thấy đâu là agent, đâu là harness
 
 Mã dưới đây dùng Anthropic Python SDK 2.x (gọi thẳng Messages API, tự viết vòng lặp để mọi thành
-phần harness lộ ra) và MCP Python SDK 2.x cho phần tool. Nếu bạn dùng LangGraph như bài 4, mỗi ô
+phần harness lộ ra) và MCP Python SDK 2.x cho phần tool. Nếu bạn dùng LangGraph như [bài 4](#/blog/langgraph-ai-agents), mỗi ô
 trong sơ đồ thành một node và state của graph thay cho `progress.json`; các thành phần harness vẫn
 y nguyên, chỉ đổi chỗ đứng.
 
@@ -427,7 +466,7 @@ SEARCH = ToolSpec(
 ```
 
 `ToolSpec` giữ hai cờ `read_only` và `network` để `policy.py` quyết định mà không cần biết từng
-tool; đó cũng là ý tưởng *annotation* của MCP mà bài 5 đã nhắc. Nếu muốn một agent khác dùng lại
+tool; đó cũng là ý tưởng *annotation* của MCP mà [bài 5](#/blog/mcp-model-context-protocol) đã nhắc. Nếu muốn một agent khác dùng lại
 bộ tool này, `tools/mcp_server.py` chỉ cần bọc chúng:
 
 ```python
@@ -571,7 +610,7 @@ là con số đáng nhìn: 75% mỗi lần nghe ổn, nhưng xác suất ba lầ
 Mỗi thành phần ở trên có giá: code phải bảo trì, token để tóm tắt, tiền cho evaluator, và thời
 gian chạy. Harness đầy đủ của Anthropic đắt gấp 20 lần lời gọi trần. Vì vậy:
 
-- Một câu hỏi trả lời được trong một lần tìm và một lần gọi model thì không cần agent, càng không cần harness; RAG của bài 1 là đủ.
+- Một câu hỏi trả lời được trong một lần tìm và một lần gọi model thì không cần agent, càng không cần harness; RAG của [bài 1](#/blog/rag-fundamentals) là đủ.
 - Việc có đường đi cố định (tìm, tóm tắt, dịch) nên là workflow có code điều khiển, như Anthropic phân biệt với agent; verifier và trace vẫn hữu ích, nhưng bỏ vòng lặp mở.
 - Bắt đầu bằng ba thứ rẻ nhất mà lợi nhất: định nghĩa xong kiểm được bằng lệnh, một verifier bằng code, và một file tiến độ. Khoá học và Anthropic đều xếp phản hồi kiểm chứng là thành phần có ROI cao nhất.
 - Thêm từng thành phần khi có *lỗi thật* đòi hỏi nó, và đo bằng eval trước và sau. Bỏ thành phần khi model mới khiến nó thừa.
@@ -581,9 +620,16 @@ gian chạy. Harness đầy đủ của Anthropic đắt gấp 20 lần lời g�
 
 ## Kết lại chuỗi bài
 
-Sáu bài là một đường đi duy nhất. RAG đưa kiến thức ngoài vào context. LangChain cho các khối tiêu
-chuẩn để lắp pipeline. LangGraph cho state và nhánh khi pipeline không còn thẳng. Agent cho model
-quyền tự quyết bước tiếp theo, MCP cho nó một cách nói chuyện chung với mọi tool. Harness
-engineering là lớp cuối: biến tất cả những điều đó thành một hệ thống chạy dài hơi, có kiểm chứng,
-có trace, và có thể tiếp tục sau khi đứt phiên. Model sẽ còn mạnh lên, và một phần harness hôm nay
+Sáu bài là một đường đi duy nhất, mỗi bước sửa điểm yếu của bước trước. Một LLM đứng một mình
+không biết dữ liệu của bạn và sẵn sàng bịa; [bài 1](#/blog/rag-fundamentals) đưa RAG vào để model
+trả lời trên tài liệu thật. Nhưng tự ghép các mảnh của RAG rất mất công và mỗi vendor một kiểu, nên
+[bài 2](#/blog/langchain-rag-from-scratch) dùng LangChain để các mảnh có hình dạng chuẩn, lắp vào
+và thay ra được. Bản RAG đó chỉ đẹp trong demo; [bài 3](#/blog/rag-production-techniques) chỉnh
+từng khâu để nó chịu được tài liệu thật, người dùng thật, và đo được bằng số. Dù tốt đến đâu, RAG vẫn
+là đường một chiều, tra một lần rồi trả lời một lần; [bài 4](#/blog/langgraph-ai-agents) thêm vòng
+lặp, nhánh và bộ nhớ chung bằng LangGraph, rồi để model tự quyết bước tiếp theo, tức là agent. Agent
+chỉ hữu ích bằng tool của nó, mà mỗi tool lại là một API phải nối tay;
+[bài 5](#/blog/mcp-model-context-protocol) đưa MCP vào làm ổ cắm chung. Và khi model đã thông minh,
+tool đã đủ, việc dài vẫn trôi; bài này dựng harness quanh model để nó chạy dài hơi, tự kiểm chứng, để
+lại dấu vết, và tiếp tục được sau khi đứt phiên. Model sẽ còn mạnh lên, và một phần harness hôm nay
 sẽ thừa; nhưng câu hỏi "model còn chưa tự làm được gì, và ta bù bằng cấu trúc nào" thì vẫn ở đó.
