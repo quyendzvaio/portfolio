@@ -6,7 +6,7 @@ import Comments from './components/Comments'
 import SyncButton from './components/SyncButton'
 import Backdrop from './components/Backdrop'
 import Portrait from './components/Portrait'
-import { Marquee, PostCard, Rotator, Stat, delay } from './components/Landing'
+import { PostCard, SkillList, Stat, delay } from './components/Landing'
 import ContactLinks from './components/Icons'
 import ProfileEditor from './components/ProfileEditor'
 import { apiConfigured, clearToken, getMe, loginAdmin, setToken } from './lib/api'
@@ -102,10 +102,7 @@ function Home() {
             <span className="eyebrow" data-reveal><span className="pulse" aria-hidden="true" />{p.available}</span>
           )}
           <h1 className="hero-name" data-reveal style={delay(80)}>{p.name}</h1>
-          <p className="hero-role" data-reveal style={delay(160)}>
-            {p.role}
-            {skills.length > 0 && <><span className="hero-sep" aria-hidden="true">/</span><Rotator words={skills} /></>}
-          </p>
+          <p className="hero-role" data-reveal style={delay(160)}>{p.role}</p>
           <p className="hero-intro" data-reveal style={delay(240)}>{p.intro}</p>
           <div className="hero-cta" data-reveal style={delay(320)}>
             <a className="btn btn-neon" href="#/chat">Ask my AI <span aria-hidden="true">→</span></a>
@@ -122,7 +119,7 @@ function Home() {
         </section>
       )}
 
-      {skills.length > 0 && <Marquee items={skills} />}
+      {skills.length > 0 && <SkillList items={skills} />}
 
       {posts.length > 0 && (
         <section className="latest">

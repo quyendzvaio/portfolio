@@ -5,28 +5,6 @@ import { trackPointer, useMotion } from '../lib/motion'
 /** Staggers a `[data-reveal]` element: CSS reads --d as its transition delay. */
 export const delay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties
 
-/** Cycles through words with a slide-and-fade; with motion off it shows the first. */
-export function Rotator({ words }: { words: string[] }) {
-  const motion = useMotion()
-  const [index, setIndex] = useState(0)
-  useEffect(() => {
-    if (!motion || words.length < 2) return
-    const timer = setInterval(() => setIndex((i) => (i + 1) % words.length), 2400)
-    return () => clearInterval(timer)
-  }, [motion, words.length])
-  const word = words[index % words.length] ?? ''
-  // The rotator is as wide as its longest word, so the role line wraps the same way
-  // for every word instead of the hero jumping a line when a long one comes round.
-  const longest = words.reduce((a, b) => (b.length > a.length ? b : a), '')
-  return (
-    <span className="rotator" aria-live="polite">
-      <span className="rotator-sizer" aria-hidden="true">{longest}</span>
-      {/* key remounts the span so the entry animation replays for each word */}
-      <span key={word} className="rotator-word">{word}</span>
-    </span>
-  )
-}
-
 /**
  * A headline number. A leading numeric part ("40" in "40%") counts up from zero the
  * first time the card scrolls into view; the rest of the value is kept as typed.
@@ -67,18 +45,19 @@ export function Stat({ value, label, wait }: { value: string; label: string; wai
 }
 
 /** Endless strip of skills. The list is rendered twice so the loop has no seam. */
-export function Marquee({ items }: { items: string[] }) {
+/** Every skill at once, as a wrapped row of pills: readable at a glance, nothing moves. */
+export function SkillList({ items }: { items: string[] }) {
   return (
-    <section className="marquee" data-reveal aria-label="Skills">
-      <div className="marquee-track">
-        {[0, 1].map((copy) => (
-          <ul key={copy} aria-hidden={copy === 1 ? 'true' : undefined}>
-            {items.map((item) => (
-              <li key={item}><span className="marquee-dot" />{item}</li>
-            ))}
-          </ul>
-        ))}
+    <section className="skills" aria-labelledby="skills-title">
+      <div className="section-head" data-reveal>
+        <div>
+          <p className="kicker">Toolkit</p>
+          <h2 id="skills-title">Skills</h2>
+        </div>
       </div>
+      <ul className="skill-list" data-reveal style={delay(80)}>
+        {items.map((item) => <li key={item}><span className="skill-dot" aria-hidden="true" />{item}</li>)}
+      </ul>
     </section>
   )
 }

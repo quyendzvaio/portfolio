@@ -14,7 +14,7 @@ export interface Profile {
   // Landing-page extras. Optional so an older profile.json still renders.
   /** Status line in the hero badge; empty hides the badge. */
   available?: string
-  /** Rotating words in the hero, orbit chips around the portrait, and the marquee. */
+  /** The Skills section; the first three also label the portrait. */
   skills?: string[]
   /** Up to four headline numbers; a leading number counts up on screen. */
   stats?: { value: string; label: string }[]

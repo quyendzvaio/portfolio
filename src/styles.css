@@ -167,14 +167,6 @@ button:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
   display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 18px 0 0;
   font-family: var(--font-display); font-size: clamp(1.15rem, 2.2vw, 1.5rem); font-weight: 500;
 }
-.hero-sep { color: var(--pink); text-shadow: 0 0 12px var(--pink); }
-.rotator { display: inline-grid; overflow: hidden; }
-.rotator > * { grid-area: 1 / 1; white-space: nowrap; }
-.rotator-sizer { visibility: hidden; }
-.rotator-word {
-  background: linear-gradient(90deg, var(--cyan), var(--violet)); -webkit-background-clip: text; background-clip: text; color: transparent;
-  animation: word-in .6s var(--ease-out) both;
-}
 .hero-intro { max-width: 54ch; margin: 18px 0 0; font-size: 1.08rem; line-height: 1.75; color: var(--muted); }
 .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin: 30px 0 26px; }
 
@@ -265,21 +257,15 @@ button:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
 }
 .stat-label { color: var(--muted); }
 
-.marquee {
-  overflow: hidden; padding: 6px 0;
-  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+.skill-list { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.skill-list li {
+  display: inline-flex; align-items: center; gap: 10px; padding: 10px 18px; border-radius: 999px;
+  font: 500 1rem/1.2 var(--font-display); color: var(--text);
+  background: rgba(14, 16, 30, .7); box-shadow: inset 0 0 0 1px var(--border-strong);
+  transition: box-shadow .3s, color .3s;
 }
-.marquee-track { display: flex; width: max-content; animation: marquee 38s linear infinite; }
-.marquee:hover .marquee-track { animation-play-state: paused; }
-.marquee ul { display: flex; gap: 44px; margin: 0; padding: 0 22px; list-style: none; }
-.marquee li {
-  display: inline-flex; align-items: center; gap: 14px; white-space: nowrap;
-  font: 600 clamp(1.3rem, 3vw, 2rem)/1.2 var(--font-display); color: rgba(238, 241, 255, .5);
-  transition: color .3s, text-shadow .3s;
-}
-.marquee li:hover { color: #fff; text-shadow: 0 0 18px var(--cyan); }
-.marquee-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 12px var(--pink); }
+.skill-list li:hover { color: #fff; box-shadow: inset 0 0 0 1px var(--cyan), 0 0 24px -8px var(--cyan); }
+.skill-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 10px var(--pink); }
 
 .section-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 22px; }
 .section-head h2 { margin: 0; font-size: clamp(1.8rem, 4vw, 2.6rem); }
@@ -444,8 +430,6 @@ article.fade-in { position: relative; }
 @keyframes ping { 0% { transform: scale(.6); opacity: 1; } 100% { transform: scale(2.2); opacity: 0; } }
 /* A neon tube striking: two flickers, then steady. */
 @keyframes neon-on { 0% { opacity: .2; } 8% { opacity: 1; } 12% { opacity: .35; } 20% { opacity: 1; } 24% { opacity: .55; } 30%, 100% { opacity: 1; } }
-@keyframes word-in { from { opacity: 0; transform: translateY(60%); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
-@keyframes marquee { to { transform: translateX(-50%); } }
 
 /* Motion off (footer toggle or OS reduce-motion): finish every animation at its
    final frame and show reveal content immediately. */
