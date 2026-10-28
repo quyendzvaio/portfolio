@@ -9,6 +9,14 @@ interface Msg { role: 'user' | 'ai'; text: string }
 /** Answers already paid for in this visit, keyed by question + retrieved sections. */
 const answers = new Map<string, string>()
 
+// Asked once per visit and shared: a question sent before the reply arrives waits for
+// it instead of falling back to raw retrieval.
+let status: Promise<boolean> | null = null
+const llmStatus = () =>
+  (status ??= apiConfigured()
+    ? getChatStatus().then((s) => s.llmEnabled, () => { status = null; return false })
+    : Promise.resolve(false))
+
 export default function ChatBox() {
   const lang = useLang()
   const t = useT()
@@ -19,13 +27,9 @@ export default function ChatBox() {
   const [llmEnabled, setLlmEnabled] = useState<boolean | null>(null)
 
   useEffect(() => {
-    if (!apiConfigured()) {
-      setLlmEnabled(false)
-      return
-    }
-    getChatStatus()
-      .then((status) => setLlmEnabled(status.llmEnabled))
-      .catch(() => setLlmEnabled(false))
+    let alive = true
+    void llmStatus().then((enabled) => { if (alive) setLlmEnabled(enabled) })
+    return () => { alive = false }
   }, [])
 
   const send = async () => {
@@ -42,11 +46,12 @@ export default function ChatBox() {
     // local "not found" answer is the right one and costs nothing. Repeated questions
     // in this visit reuse their answer.
     const key = `${lang}\u0000${query.toLowerCase()}\u0000${hits.map((h) => h.id).join(',')}`
+    const llm = llmEnabled ?? (await llmStatus())
     try {
-      const answer = !llmEnabled || !hits.length
+      const answer = !llm || !hits.length
         ? fallbackAnswer(query, hits)
         : answers.get(key) ?? (await askChat(query, hits, lang)).answer
-      if (llmEnabled && hits.length) answers.set(key, answer)
+      if (llm && hits.length) answers.set(key, answer)
       setLog((l) => [...l, { role: 'ai', text: answer }])
     } catch (e) {
       setLog((l) => [...l, {
