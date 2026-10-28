@@ -186,7 +186,7 @@ Secrets and variables → Actions → Variables) to your API URL; without it the
 site builds with comments and admin disabled.
 
 **Backend → Vercel (serverless).** `vercel.json` builds only the backend
-(`npm run build:server`), and `api/[...path].js` serves every `/api/*` request with
+(`npm run build:server`), and `api/index.js` (every `/api/*` path is rewritten to it) serves each request with
 the same `listener` the Docker server uses. The frontend stays on GitHub Pages.
 `regions: ["sin1"]` keeps the function in Singapore, next to the Blob store and the
 site's (Vietnamese) visitors; create the store in the same region.

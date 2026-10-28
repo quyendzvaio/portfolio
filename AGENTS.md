@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## What this is
-Vite + React 19 + TS static frontend (`src/`) + small Node backend (`server/src/`, raw `node:http`, no framework). Deploys: frontend → GitHub Pages, backend → Vercel functions (`api/[...path].js` wraps `listener` from `server/src/index.ts`), backend → VPS via compose.
+Vite + React 19 + TS static frontend (`src/`) + small Node backend (`server/src/`, raw `node:http`, no framework). Deploys: frontend → GitHub Pages, backend → Vercel functions (`api/index.js` wraps `listener` from `server/src/index.ts`; `vercel.json` rewrites every `/api/*` path to it), backend → VPS via compose.
 
 ## Commands
 - Frontend: `npm run dev` (needs `.env`), `npm run build` (= `tsc --noEmit && vite build`), `npm run preview`.

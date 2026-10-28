@@ -1,0 +1,7 @@
+# CLI deploys upload the working tree; keep local secrets and machine state out.
+.env
+.env.*
+.codegraph/
+node_modules/
+dist/
+server/dist/
