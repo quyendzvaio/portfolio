@@ -36,6 +36,10 @@ export async function ask(query: string, context: ContextChunk[], lang: Lang = '
       // low-temperature answer is what a grounded portfolio chat needs.
       max_tokens: env.llm.maxTokens,
       temperature: 0.2,
+      // Reasoning models spend max_tokens on hidden thinking first: with a 400-token
+      // cap, nemotron used all 400 thinking and returned no answer. Grounded lookup
+      // answers don't need it; OpenRouter ignores this for models that don't reason.
+      reasoning: { enabled: false },
       messages: [
         { role: 'system', content: systemPrompt(lang) },
         {
@@ -47,6 +51,10 @@ export async function ask(query: string, context: ContextChunk[], lang: Lang = '
     signal: AbortSignal.timeout(env.llm.timeoutMs),
   })
   if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${(await res.text()).slice(0, 200)}`)
-  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] }
-  return data.choices?.[0]?.message?.content ?? '(empty response)'
+  const data = (await res.json()) as { choices?: { message?: { content?: string }; finish_reason?: string }[] }
+  const answer = data.choices?.[0]?.message?.content?.trim()
+  // An empty answer is a failure, not a reply: throwing lets the chat fall back to
+  // showing the retrieved passages instead of printing nothing.
+  if (!answer) throw new Error(`OpenRouter returned no answer (finish_reason: ${data.choices?.[0]?.finish_reason ?? 'none'})`)
+  return answer
 }
