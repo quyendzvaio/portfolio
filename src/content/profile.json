@@ -10,5 +10,11 @@
   "gmail": "nquyenworkspace@gmail.com",
   "links": [
     { "label": "GitHub", "url": "https://github.com/quyendzvaio" }
-  ]
+  ],
+  "vi": {
+    "name": "Ninh Văn Quyền",
+    "role": "Sinh viên CNTT · Định hướng AI Engineer",
+    "intro": "Sinh viên CNTT đang tìm vị trí thực tập AI Engineer, nơi tôi có thể tiếp tục học tập và nghiên cứu về AI. Tôi xây dựng AI agent và pipeline RAG đáng tin cậy, giúp giảm việc thủ công và mang lại giá trị đo lường được cho doanh nghiệp.",
+    "available": "Đang tìm cơ hội thực tập AI"
+  }
 }

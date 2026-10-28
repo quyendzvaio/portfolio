@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 790" width="1200" height="790" font-family="Inter, Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/>
+    </marker>
+    <marker id="arrow-pink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff3ddc"/>
+    </marker>
+    <marker id="arrow-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#a78bfa"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4ade80"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="790" rx="24" fill="#0b0d19"/>
+
+  <!-- Indexing group -->
+  <rect x="30" y="50" width="1140" height="190" rx="16" fill="none" stroke="#22d3ee" stroke-opacity="0.35" stroke-width="1.5" stroke-dasharray="6 6"/>
+  <text x="50" y="82" font-size="18" fill="#22d3ee" font-weight="600">INDEXING  (offline, runs once per document)</text>
+
+  <!-- Row 1 boxes -->
+  <rect x="50" y="120" width="180" height="84" rx="12" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="140" y="155" font-size="18" fill="#eef1ff" text-anchor="middle">Sources</text>
+  <text x="140" y="182" font-size="15" fill="#9ba3c4" text-anchor="middle">PDF, wiki, DB, web</text>
+
+  <rect x="270" y="120" width="180" height="84" rx="12" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="360" y="155" font-size="18" fill="#eef1ff" text-anchor="middle">Load</text>
+  <text x="360" y="182" font-size="15" fill="#9ba3c4" text-anchor="middle">raw text + metadata</text>
+
+  <rect x="490" y="120" width="180" height="84" rx="12" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="580" y="155" font-size="18" fill="#eef1ff" text-anchor="middle">Parse &amp; chunk</text>
+  <text x="580" y="182" font-size="15" fill="#9ba3c4" text-anchor="middle">~300-token pieces</text>
+
+  <rect x="710" y="120" width="180" height="84" rx="12" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="800" y="155" font-size="18" fill="#eef1ff" text-anchor="middle">Embed</text>
+  <text x="800" y="182" font-size="15" fill="#9ba3c4" text-anchor="middle">text to vector</text>
+
+  <rect x="930" y="120" width="220" height="84" rx="12" fill="#11142a" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="1040" y="155" font-size="18" fill="#eef1ff" text-anchor="middle">Vector store</text>
+  <text x="1040" y="182" font-size="15" fill="#9ba3c4" text-anchor="middle">ids, vectors, metadata</text>
+
+  <!-- Row 1 arrows -->
+  <line x1="230" y1="162" x2="270" y2="162" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrow-cyan)"/>
+  <line x1="450" y1="162" x2="490" y2="162" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrow-cyan)"/>
+  <line x1="670" y1="162" x2="710" y2="162" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrow-cyan)"/>
+  <line x1="890" y1="162" x2="930" y2="162" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrow-cyan)"/>
+
+  <!-- Vector store -> Retrieve connector -->
+  <path d="M1040,204 L1040,330 L565,330 L565,430" fill="none" stroke="#a78bfa" stroke-width="2" marker-end="url(#arrow-violet)"/>
+  <text x="590" y="372" font-size="15" fill="#9ba3c4">similarity search returns top-k chunks</text>
+
+  <!-- Query group -->
+  <rect x="30" y="380" width="1140" height="340" rx="16" fill="none" stroke="#ff3ddc" stroke-opacity="0.35" stroke-width="1.5" stroke-dasharray="6 6"/>
+  <text x="50" y="412" font-size="18" fill="#ff3ddc" font-weight="600">QUERY  (online, runs for every question)</text>
+
+  <!-- Row 2 boxes -->
+  <rect x="50" y="430" width="160" height="84" rx="12" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+  <text x="130" y="465" font-size="18" fill="#eef1ff" text-anchor="middle">Question</text>
+  <text x="130" y="492" font-size="15" fill="#9ba3c4" text-anchor="middle">from the user</text>
+
+  <rect x="250" y="430" width="190" height="84" rx="12" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+  <text x="345" y="465" font-size="18" fill="#eef1ff" text-anchor="middle">Query processing</text>
+  <text x="345" y="492" font-size="15" fill="#9ba3c4" text-anchor="middle">clean, rewrite, embed</text>
+
+  <rect x="480" y="430" width="170" height="84" rx="12" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+  <text x="565" y="465" font-size="18" fill="#eef1ff" text-anchor="middle">Retrieve</text>
+  <text x="565" y="492" font-size="15" fill="#9ba3c4" text-anchor="middle">top-k candidates</text>
+
+  <rect x="690" y="430" width="150" height="84" rx="12" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+  <text x="765" y="465" font-size="18" fill="#eef1ff" text-anchor="middle">Rerank</text>
+  <text x="765" y="492" font-size="15" fill="#9ba3c4" text-anchor="middle">keep best 3-5</text>
+
+  <rect x="880" y="430" width="190" height="84" rx="12" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+  <text x="975" y="465" font-size="18" fill="#eef1ff" text-anchor="middle">Build prompt</text>
+  <text x="975" y="492" font-size="15" fill="#9ba3c4" text-anchor="middle">question + chunks</text>
+
+  <!-- Row 2 arrows -->
+  <line x1="210" y1="472" x2="250" y2="472" stroke="#ff3ddc" stroke-width="2" marker-end="url(#arrow-pink)"/>
+  <line x1="440" y1="472" x2="480" y2="472" stroke="#ff3ddc" stroke-width="2" marker-end="url(#arrow-pink)"/>
+  <line x1="650" y1="472" x2="690" y2="472" stroke="#ff3ddc" stroke-width="2" marker-end="url(#arrow-pink)"/>
+  <line x1="840" y1="472" x2="880" y2="472" stroke="#ff3ddc" stroke-width="2" marker-end="url(#arrow-pink)"/>
+
+  <!-- Row 3: generation -->
+  <line x1="975" y1="514" x2="975" y2="600" stroke="#4ade80" stroke-width="2" marker-end="url(#arrow-green)"/>
+
+  <rect x="880" y="600" width="190" height="84" rx="12" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="975" y="635" font-size="18" fill="#eef1ff" text-anchor="middle">Generate (LLM)</text>
+  <text x="975" y="662" font-size="15" fill="#9ba3c4" text-anchor="middle">reads only the prompt</text>
+
+  <line x1="880" y1="642" x2="800" y2="642" stroke="#4ade80" stroke-width="2" marker-end="url(#arrow-green)"/>
+
+  <rect x="560" y="600" width="240" height="84" rx="12" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="680" y="635" font-size="18" fill="#eef1ff" text-anchor="middle">Answer + citations</text>
+  <text x="680" y="662" font-size="15" fill="#9ba3c4" text-anchor="middle">each claim points at a chunk</text>
+
+  <!-- Legend -->
+  <rect x="50" y="748" width="16" height="16" rx="3" fill="none" stroke="#22d3ee" stroke-width="2"/>
+  <text x="76" y="762" font-size="15" fill="#9ba3c4">indexing stage</text>
+  <rect x="230" y="748" width="16" height="16" rx="3" fill="none" stroke="#a78bfa" stroke-width="2"/>
+  <text x="256" y="762" font-size="15" fill="#9ba3c4">storage shared by both sides</text>
+  <rect x="500" y="748" width="16" height="16" rx="3" fill="none" stroke="#ff3ddc" stroke-width="2"/>
+  <text x="526" y="762" font-size="15" fill="#9ba3c4">query stage</text>
+  <rect x="650" y="748" width="16" height="16" rx="3" fill="none" stroke="#4ade80" stroke-width="2"/>
+  <text x="676" y="762" font-size="15" fill="#9ba3c4">generation</text>
+</svg>

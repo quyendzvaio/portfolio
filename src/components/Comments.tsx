@@ -10,6 +10,7 @@ import {
   toggleReaction,
   type ApiComment,
 } from '../lib/api'
+import { t as translate, useT } from '../lib/i18n'
 
 const NAME_KEY = 'portfolio.commenter.name'
 const VIEWER_KEY = 'portfolio.viewer.id'
@@ -69,6 +70,8 @@ export default function Comments({
   slug: string
   bodyRef: RefObject<HTMLDivElement | null>
 }) {
+  // Cards below read the module-level `translate`; they re-render with this component.
+  const t = useT()
   const [comments, setComments] = useState<ApiComment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -195,10 +198,8 @@ export default function Comments({
   if (!apiConfigured()) {
     return (
       <section className="card">
-        <h3>Discuss this post</h3>
-        <p className="muted small">
-          Comments are off in this build. Owner: set <code>VITE_API_BASE_URL</code> to the backend URL and rebuild.
-        </p>
+        <h3>{t('c.title')}</h3>
+        <p className="muted small">{t('c.off')}</p>
       </section>
     )
   }
@@ -239,7 +240,7 @@ export default function Comments({
   }
 
   const remove = async (comment: ApiComment) => {
-    if (!confirm(`Delete the comment from ${comment.name}?`)) return
+    if (!confirm(t('c.confirmDelete', { name: comment.name }))) return
     try {
       await deleteComment(slug, comment.id)
       pollDelay.current = POLL_MIN_MS
@@ -287,7 +288,7 @@ export default function Comments({
     // crosses inline nodes (bold, code) has the block element itself as the common
     // ancestor, whose parent is the list/section — closest() would find nothing.
     const startEl = range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement
-    const block = startEl?.closest('p, li, h1, h2, h3, blockquote') ?? null
+    const block = startEl?.closest('p, li, h1, h2, h3, h4, td, blockquote') ?? null
     if (!block || !root.contains(block) || !withinBlock(range, block)) {
       setQuoted(null)
       return
@@ -342,9 +343,9 @@ export default function Comments({
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Your name (optional)"
+            placeholder={t('c.name')}
             maxLength={40}
-            aria-label="Your name"
+            aria-label={t('c.nameLabel')}
           />
           <div className="row">
             <textarea
@@ -355,36 +356,34 @@ export default function Comments({
               }}
               rows={2}
               maxLength={2000}
-              placeholder="Comment on this selection…"
-              aria-label="Comment on selection"
+              placeholder={t('c.onSelection')}
+              aria-label={t('c.onSelectionLabel')}
             />
           </div>
           <div className="comment-actions">
             <button onClick={() => void submit()} disabled={sending || !body.trim()}>
-              {sending ? 'Posting…' : 'Comment'}
+              {sending ? t('c.posting') : t('c.comment')}
             </button>
             <button className="link-btn" onClick={() => { setQuoted(null); setBody('') }}>
-              cancel
+              {t('c.cancel')}
             </button>
           </div>
         </div>,
         portalEl,
       )}
       <div className="comment-head">
-        <h3>Discuss this post</h3>
-        <span className={`live ${live ? 'on' : ''}`} title={live ? 'Auto-refreshing while this thread is on screen' : 'Auto-refresh paused'}>
+        <h3>{t('c.title')}</h3>
+        <span className={`live ${live ? 'on' : ''}`} title={live ? t('c.liveOn') : t('c.liveOff')}>
           <span className="live-dot" />
-          {live ? 'live' : 'offline'}
+          {live ? t('c.live') : t('c.offline')}
         </span>
       </div>
 
-      <p className="muted small hint-select">
-        Tip: select any paragraph in the post to comment on exactly that passage.
-      </p>
+      <p className="muted small hint-select">{t('c.tip')}</p>
 
       {error && <p className="warn small">⚠ {error}</p>}
-      {loading && <p className="muted small">Loading comments…</p>}
-      {!loading && !comments.length && <p className="muted small">No comments yet — be the first.</p>}
+      {loading && <p className="muted small">{t('c.loading')}</p>}
+      {!loading && !comments.length && <p className="muted small">{t('c.empty')}</p>}
 
       <div className="comment-list">
         {roots.map((comment) => (
@@ -409,16 +408,16 @@ export default function Comments({
       <div className="comment-form">
         {replyTo && (
           <div className="quote-box">
-            <p className="quote-text">↩ Replying to <strong>{replyTo.name}</strong></p>
-            <button className="link-btn" onClick={() => setReplyTo(null)}>cancel reply</button>
+            <p className="quote-text">↩ {t('c.replyingTo')} <strong>{replyTo.name}</strong></p>
+            <button className="link-btn" onClick={() => setReplyTo(null)}>{t('c.cancelReply')}</button>
           </div>
         )}
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Your name (optional)"
+          placeholder={t('c.name')}
           maxLength={40}
-          aria-label="Your name"
+          aria-label={t('c.nameLabel')}
         />
         <textarea
           value={body}
@@ -428,14 +427,14 @@ export default function Comments({
           }}
           rows={3}
           maxLength={2000}
-          placeholder={replyTo ? `Reply to ${replyTo.name}…` : 'Add a comment… no account needed'}
-          aria-label="Comment body"
+          placeholder={replyTo ? t('c.replyTo', { name: replyTo.name }) : t('c.add')}
+          aria-label={t('c.bodyLabel')}
         />
         <div className="comment-actions">
           <button onClick={submit} disabled={sending || !body.trim()}>
-            {sending ? 'Posting…' : replyTo ? 'Post reply' : 'Post comment'}
+            {sending ? t('c.posting') : replyTo ? t('c.postReply') : t('c.post')}
           </button>
-          <span className="muted small">Ctrl/⌘ + Enter to post · stored in Blob storage</span>
+          <span className="muted small">{t('c.hint')}</span>
         </div>
       </div>
     </section>
@@ -498,13 +497,13 @@ function CommentCard({
           <span className="comment-name">{comment.name}</span>
           <span className="muted small">{when(comment.createdAt)}</span>
           {admin && (
-            <button className="link-btn" onClick={() => onDelete(comment)} title="Delete this comment">
-              delete
+            <button className="link-btn" onClick={() => onDelete(comment)} title={translate('c.deleteTitle')}>
+              {translate('c.delete')}
             </button>
           )}
           <button
             className="kebab"
-            aria-label="Comment actions"
+            aria-label={translate('c.actions')}
             aria-expanded={menuOpen}
             onClick={(e) => {
               e.stopPropagation()
@@ -529,7 +528,7 @@ function CommentCard({
                 key={kind}
                 className={`chip ${mine === kind ? 'mine' : ''}`}
                 onClick={() => onReact(comment, kind)}
-                title={mine === kind ? `Remove your ${kind}` : `React ${kind}`}
+                title={translate(mine === kind ? 'c.unreact' : 'c.react', { kind })}
               >
                 {EMOJI[kind]} {count}
               </button>
@@ -544,7 +543,7 @@ function CommentCard({
                 key={kind}
                 className={`reaction-btn ${mine === kind ? 'mine' : ''}`}
                 onClick={() => onReact(comment, kind)}
-                title={`React ${kind}`}
+                title={translate('c.react', { kind })}
               >
                 {EMOJI[kind]}
               </button>
@@ -560,7 +559,7 @@ function CommentCard({
                 onMenu(null)
               }}
             >
-              ↩ Reply
+              {translate('c.reply')}
             </button>
           </div>
         )}

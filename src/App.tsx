@@ -11,6 +11,7 @@ import ContactLinks from './components/Icons'
 import ProfileEditor from './components/ProfileEditor'
 import { apiConfigured, clearToken, getMe, loginAdmin, setToken } from './lib/api'
 import { setMotion, useMotion, useReveal } from './lib/motion'
+import { setLang, useLang, useT } from './lib/i18n'
 
 type Route = { page: string; slug?: string }
 
@@ -23,6 +24,9 @@ function parseHash(): Route {
 export default function App() {
   const [route, setRoute] = useState<Route>(parseHash)
   const motion = useMotion()
+  // Reading the language here re-renders the whole tree on a switch.
+  const lang = useLang()
+  const t = useT()
   useEffect(() => {
     const onChange = () => {
       setRoute(parseHash())
@@ -38,10 +42,10 @@ export default function App() {
   }, [profile.name, profile.role])
 
   const nav = [
-    { page: 'home', href: '#/', label: 'Home' },
-    { page: 'blog', href: '#/blog', label: 'Blog' },
-    { page: 'chat', href: '#/chat', label: 'Ask AI' },
-    { page: 'admin', href: '#/admin', label: 'Admin' },
+    { page: 'home', href: '#/', label: t('nav.home') },
+    { page: 'blog', href: '#/blog', label: t('nav.blog') },
+    { page: 'chat', href: '#/chat', label: t('nav.chat') },
+    { page: 'admin', href: '#/admin', label: t('nav.admin') },
   ]
 
   return (
@@ -54,6 +58,15 @@ export default function App() {
             {nav.map((item) => (
               <a key={item.page} href={item.href} className={route.page === item.page ? 'active' : ''}>{item.label}</a>
             ))}
+            <button
+              className="lang-switch"
+              onClick={() => setLang(lang === 'en' ? 'vi' : 'en')}
+              aria-label={t('lang.switch')}
+              title={t('lang.switch')}
+            >
+              <span className={lang === 'en' ? 'on' : ''}>EN</span>
+              <span className={lang === 'vi' ? 'on' : ''}>VI</span>
+            </button>
           </div>
         </nav>
 
@@ -63,8 +76,8 @@ export default function App() {
           {route.page === 'blog' && route.slug && <Post slug={route.slug} />}
           {route.page === 'chat' && (
             <section className="card fade-in">
-              <h1>Ask about this portfolio</h1>
-              <p className="muted">Grounded in profile + {posts.length} blog post(s). Answers cite their sources.</p>
+              <h1>{t('chat.title')}</h1>
+              <p className="muted">{t('chat.sub', { n: posts.length })}</p>
               <ChatBox />
             </section>
           )}
@@ -76,7 +89,7 @@ export default function App() {
           <p className="small">
             © {new Date().getFullYear()} {profile.name} ·{' '}
             <button className="link-btn" onClick={() => setMotion(!motion)} aria-pressed={motion}>
-              motion {motion ? 'on' : 'off'}
+              {t('footer.motion', { state: t(motion ? 'footer.on' : 'footer.off') })}
             </button>
           </p>
         </footer>
@@ -88,6 +101,7 @@ export default function App() {
 // Everything on the landing page comes from src/content/profile.json (editable from
 // #/admin): sections whose data is missing simply do not render.
 function Home() {
+  const t = useT()
   const p = getProfile()
   const posts = getPosts().filter((post) => !post.error).slice(0, 3)
   const skills = p.skills ?? []
@@ -105,8 +119,8 @@ function Home() {
           <p className="hero-role" data-reveal style={delay(160)}>{p.role}</p>
           <p className="hero-intro" data-reveal style={delay(240)}>{p.intro}</p>
           <div className="hero-cta" data-reveal style={delay(320)}>
-            <a className="btn btn-neon" href="#/chat">Ask my AI <span aria-hidden="true">→</span></a>
-            <a className="btn btn-ghost" href="#/blog">Read the blog</a>
+            <a className="btn btn-neon" href="#/chat">{t('hero.ask')} <span aria-hidden="true">→</span></a>
+            <a className="btn btn-ghost" href="#/blog">{t('hero.blog')}</a>
           </div>
           <div data-reveal style={delay(400)}><ContactLinks profile={p} /></div>
         </div>
@@ -125,10 +139,10 @@ function Home() {
         <section className="latest">
           <div className="section-head" data-reveal>
             <div>
-              <p className="kicker">Writing</p>
-              <h2>Latest posts</h2>
+              <p className="kicker">{t('posts.kicker')}</p>
+              <h2>{t('posts.latest')}</h2>
             </div>
-            <a href="#/blog">All posts →</a>
+            <a href="#/blog">{t('posts.all')}</a>
           </div>
           <div className="grid">
             {posts.map((post, i) => <PostCard key={post.slug} post={post} wait={i * 110} />)}
@@ -137,22 +151,23 @@ function Home() {
       )}
 
       <section className="cta-band" data-reveal>
-        <p className="kicker">Ask, don't scroll</p>
-        <h2>Curious how I work?</h2>
-        <p className="muted">Ask the AI grounded in this site — every answer cites the post or profile it came from.</p>
-        <a className="btn btn-neon" href="#/chat">Start a conversation <span aria-hidden="true">→</span></a>
+        <p className="kicker">{t('cta.kicker')}</p>
+        <h2>{t('cta.title')}</h2>
+        <p className="muted">{t('cta.body')}</p>
+        <a className="btn btn-neon" href="#/chat">{t('cta.button')} <span aria-hidden="true">→</span></a>
       </section>
     </div>
   )
 }
 
 function BlogList() {
+  const t = useT()
   const posts = getPosts()
   useReveal()
   return (
     <section className="fade-in">
-      <p className="kicker">Writing</p>
-      <h1>Blog</h1>
+      <p className="kicker">{t('posts.kicker')}</p>
+      <h1>{t('blog.title')}</h1>
       <div className="grid">
         {posts.map((post, i) => <PostCard key={post.slug} post={post} wait={i * 80} />)}
       </div>
@@ -163,12 +178,13 @@ function BlogList() {
 function Post({ slug }: { slug: string }) {
   // bodyRef lets the comment panel listen for selections inside the rendered
   // markdown, so readers can comment on exactly the passage they highlighted.
+  const t = useT()
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const post = getPosts().find((p) => p.slug === slug)
-  if (!post) return <p>Post not found. <a href="#/blog">Back to blog</a></p>
+  if (!post) return <p>{t('posts.notFound')} <a href="#/blog">{t('posts.backToBlog')}</a></p>
   return (
-    <article className="fade-in">
-      <a href="#/blog">← Blog</a>
+    <article className="fade-in" lang={post.lang}>
+      <a href="#/blog">{t('posts.back')}</a>
       <h1>{post.meta.title}</h1>
       <p className="muted small">{post.meta.date} · {post.meta.tags.join(', ')}</p>
       <div className="card post-body" ref={bodyRef} dangerouslySetInnerHTML={{ __html: mdToHtml(post.body) }} />

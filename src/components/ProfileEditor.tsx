@@ -8,8 +8,8 @@ const MAX_AVATAR_BYTES = 2 * 1024 * 1024
 // browser: the file in git is what every visitor sees, so a save here shows up on
 // the live site once GitHub Actions finishes redeploying.
 export default function ProfileEditor() {
-  const [form, setForm] = useState<Profile>(() => getProfile())
-  const [baseline, setBaseline] = useState<Profile>(() => getProfile())
+  const [form, setForm] = useState<Profile>(() => getProfile('en'))
+  const [baseline, setBaseline] = useState<Profile>(() => getProfile('en'))
   const [fromRepo, setFromRepo] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -26,7 +26,7 @@ export default function ProfileEditor() {
     }
     try {
       const { profile } = await getRepoProfile()
-      const merged = { ...getProfile(), ...profile }
+      const merged = { ...getProfile('en'), ...profile }
       setForm(merged)
       setBaseline(merged)
       setFromRepo(true)
@@ -74,7 +74,7 @@ export default function ProfileEditor() {
       const result = await saveProfile(form)
       // Show what was committed, not what was typed: the server drops disallowed links
       // and trims fields, and the form must not claim those survived.
-      const saved = { ...getProfile(), ...result.profile }
+      const saved = { ...getProfile('en'), ...result.profile }
       const cleaned = JSON.stringify(saved) !== JSON.stringify(form)
       setForm(saved)
       setBaseline(saved)

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { Post } from '../lib/store'
 import { trackPointer, useMotion } from '../lib/motion'
+import { t } from '../lib/i18n'
 
 /** Staggers a `[data-reveal]` element: CSS reads --d as its transition delay. */
 export const delay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties
@@ -51,8 +52,8 @@ export function SkillList({ items }: { items: string[] }) {
     <section className="skills" aria-labelledby="skills-title">
       <div className="section-head" data-reveal>
         <div>
-          <p className="kicker">Toolkit</p>
-          <h2 id="skills-title">Skills</h2>
+          <p className="kicker">{t('skills.kicker')}</p>
+          <h2 id="skills-title">{t('skills.title')}</h2>
         </div>
       </div>
       <ul className="skill-list" data-reveal style={delay(80)}>
@@ -70,7 +71,7 @@ export function PostCard({ post, wait = 0 }: { post: Post; wait?: number }) {
       <h3>{post.meta.title}</h3>
       <p className="muted">{post.meta.summary}</p>
       {post.error && <p className="warn">⚠ {post.error}</p>}
-      <span className="post-more">Read post <span aria-hidden="true">→</span></span>
+      <span className="post-more">{t('posts.read')} <span aria-hidden="true">→</span></span>
     </a>
   )
 }

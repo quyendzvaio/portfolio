@@ -1,0 +1,178 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 860" width="1200" height="860" font-family="Inter, Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="m-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/>
+    </marker>
+    <marker id="m-pink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff3ddc"/>
+    </marker>
+    <marker id="m-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f0b429"/>
+    </marker>
+    <marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4ade80"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="860" rx="24" fill="#0b0d19"/>
+
+  <text x="40" y="44" font-size="24" font-weight="600" fill="#eef1ff">Production RAG: two lanes and one loop</text>
+
+  <!-- legend -->
+  <circle cx="812" cy="39" r="6" fill="#22d3ee"/>
+  <text x="824" y="44" font-size="15" fill="#9ba3c4">indexing</text>
+  <circle cx="908" cy="39" r="6" fill="#ff3ddc"/>
+  <text x="920" y="44" font-size="15" fill="#9ba3c4">query</text>
+  <circle cx="980" cy="39" r="6" fill="#f0b429"/>
+  <text x="992" y="44" font-size="15" fill="#9ba3c4">eval</text>
+  <circle cx="1045" cy="39" r="6" fill="#4ade80"/>
+  <text x="1057" y="44" font-size="15" fill="#9ba3c4">loop</text>
+
+  <!-- ===== Lane 1: indexing (offline) ===== -->
+  <text x="1160" y="92" font-size="16" font-weight="600" fill="#22d3ee" text-anchor="end">INDEXING (offline, runs on every content change)</text>
+
+  <g stroke="#22d3ee" stroke-width="1.5" fill="#11142a">
+    <rect x="40" y="108" width="160" height="70" rx="12"/>
+    <rect x="230" y="108" width="160" height="70" rx="12"/>
+    <rect x="420" y="108" width="160" height="70" rx="12"/>
+    <rect x="610" y="108" width="160" height="70" rx="12"/>
+    <rect x="800" y="108" width="160" height="70" rx="12"/>
+    <rect x="990" y="108" width="160" height="70" rx="12"/>
+  </g>
+  <g font-size="18" fill="#eef1ff" text-anchor="middle">
+    <text x="120" y="140">Sources</text>
+    <text x="310" y="140">Parse</text>
+    <text x="500" y="140">Chunk</text>
+    <text x="690" y="140">Enrich</text>
+    <text x="880" y="140">Embed</text>
+    <text x="1070" y="140">Index</text>
+  </g>
+  <g font-size="15" fill="#9ba3c4" text-anchor="middle">
+    <text x="120" y="165">PDF, web, SQL, API</text>
+    <text x="310" y="165">layout + tables</text>
+    <text x="500" y="165">structure-aware</text>
+    <text x="690" y="165">context + dedup</text>
+    <text x="880" y="165">dense + sparse</text>
+    <text x="1070" y="165">vectors + filters</text>
+  </g>
+  <g stroke="#22d3ee" stroke-width="1.5" marker-end="url(#m-cyan)">
+    <line x1="200" y1="143" x2="230" y2="143"/>
+    <line x1="390" y1="143" x2="420" y2="143"/>
+    <line x1="580" y1="143" x2="610" y2="143"/>
+    <line x1="770" y1="143" x2="800" y2="143"/>
+    <line x1="960" y1="143" x2="990" y2="143"/>
+  </g>
+
+  <!-- index -> retrieve -->
+  <polyline points="1070,178 1070,225 500,225 500,268" fill="none" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#m-cyan)"/>
+  <text x="785" y="218" font-size="15" fill="#9ba3c4" text-anchor="middle">same embedding model on both sides</text>
+
+  <!-- ===== Lane 2: query (online) ===== -->
+  <text x="1160" y="252" font-size="16" font-weight="600" fill="#ff3ddc" text-anchor="end">QUERY (online, runs on every request)</text>
+
+  <g stroke="#ff3ddc" stroke-width="1.5" fill="#11142a">
+    <rect x="40" y="268" width="160" height="70" rx="12"/>
+    <rect x="230" y="268" width="160" height="70" rx="12"/>
+    <rect x="420" y="268" width="160" height="70" rx="12"/>
+    <rect x="610" y="268" width="160" height="70" rx="12"/>
+    <rect x="800" y="268" width="160" height="70" rx="12"/>
+    <rect x="990" y="268" width="160" height="70" rx="12"/>
+  </g>
+  <g font-size="18" fill="#eef1ff" text-anchor="middle">
+    <text x="120" y="300">Guardrails</text>
+    <text x="310" y="300">Rewrite</text>
+    <text x="500" y="300">Hybrid retrieve</text>
+    <text x="690" y="300">Fuse + rerank</text>
+    <text x="880" y="300">Trim + order</text>
+    <text x="1070" y="300">Generate</text>
+  </g>
+  <g font-size="15" fill="#9ba3c4" text-anchor="middle">
+    <text x="120" y="325">PII, injection</text>
+    <text x="310" y="325">multi-query, HyDE</text>
+    <text x="500" y="325">dense + BM25</text>
+    <text x="690" y="325">RRF, cross-encoder</text>
+    <text x="880" y="325">lost in the middle</text>
+    <text x="1070" y="325">grounded + cited</text>
+  </g>
+  <g stroke="#ff3ddc" stroke-width="1.5" marker-end="url(#m-pink)">
+    <line x1="200" y1="303" x2="230" y2="303"/>
+    <line x1="390" y1="303" x2="420" y2="303"/>
+    <line x1="580" y1="303" x2="610" y2="303"/>
+    <line x1="770" y1="303" x2="800" y2="303"/>
+    <line x1="960" y1="303" x2="990" y2="303"/>
+  </g>
+
+  <!-- generate -> traces -->
+  <polyline points="1070,338 1070,395 120,395 120,448" fill="none" stroke="#f0b429" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#m-amber)"/>
+  <text x="600" y="388" font-size="15" fill="#9ba3c4" text-anchor="middle">every request emits a trace: query, chunks, prompt, answer, latency, tokens, cost</text>
+
+  <!-- ===== Lane 3: eval and observability ===== -->
+  <text x="1160" y="432" font-size="16" font-weight="600" fill="#f0b429" text-anchor="end">EVAL + OBSERVABILITY</text>
+
+  <g stroke="#f0b429" stroke-width="1.5" fill="#11142a">
+    <rect x="40" y="448" width="160" height="70" rx="12"/>
+    <rect x="230" y="448" width="160" height="70" rx="12"/>
+    <rect x="420" y="448" width="160" height="70" rx="12"/>
+    <rect x="610" y="448" width="160" height="70" rx="12"/>
+    <rect x="800" y="448" width="160" height="70" rx="12"/>
+    <rect x="990" y="448" width="160" height="70" rx="12"/>
+  </g>
+  <g font-size="18" fill="#eef1ff" text-anchor="middle">
+    <text x="120" y="480">Traces</text>
+    <text x="310" y="480">Online monitor</text>
+    <text x="500" y="480">Golden set</text>
+    <text x="690" y="480">Offline eval</text>
+    <text x="880" y="480">CI gate</text>
+    <text x="1070" y="480">Re-index</text>
+  </g>
+  <g font-size="15" fill="#9ba3c4" text-anchor="middle">
+    <text x="120" y="505">p95, tokens, cost</text>
+    <text x="310" y="505">feedback, fallback</text>
+    <text x="500" y="505">questions + refs</text>
+    <text x="690" y="505">RAGAS, Recall@K</text>
+    <text x="880" y="505">block regressions</text>
+    <text x="1070" y="505">fresh data</text>
+  </g>
+  <g stroke="#f0b429" stroke-width="1.5" marker-end="url(#m-amber)">
+    <line x1="200" y1="483" x2="230" y2="483"/>
+    <line x1="390" y1="483" x2="420" y2="483"/>
+    <line x1="580" y1="483" x2="610" y2="483"/>
+    <line x1="770" y1="483" x2="800" y2="483"/>
+    <line x1="960" y1="483" x2="990" y2="483"/>
+  </g>
+
+  <!-- eval -> loop -->
+  <polyline points="690,518 690,560 210,560 210,600" fill="none" stroke="#4ade80" stroke-width="1.5" marker-end="url(#m-green)"/>
+  <text x="450" y="552" font-size="15" fill="#9ba3c4" text-anchor="middle">scores and traces feed the loop</text>
+
+  <!-- ===== The loop ===== -->
+  <g stroke="#4ade80" stroke-width="1.5" fill="#11142a">
+    <rect x="110" y="600" width="200" height="70" rx="12"/>
+    <rect x="370" y="600" width="200" height="70" rx="12"/>
+    <rect x="630" y="600" width="200" height="70" rx="12"/>
+    <rect x="890" y="600" width="200" height="70" rx="12"/>
+  </g>
+  <g font-size="20" font-weight="600" fill="#eef1ff" text-anchor="middle">
+    <text x="210" y="642">Measure</text>
+    <text x="470" y="642">Diagnose</text>
+    <text x="730" y="642">Optimize</text>
+    <text x="990" y="642">Re-evaluate</text>
+  </g>
+  <g font-size="15" fill="#9ba3c4" text-anchor="middle">
+    <text x="210" y="692">traces + eval scores</text>
+    <text x="470" y="692">which stage failed?</text>
+    <text x="730" y="692">one change at a time</text>
+    <text x="990" y="692">same golden set</text>
+  </g>
+  <g stroke="#4ade80" stroke-width="1.5" marker-end="url(#m-green)">
+    <line x1="310" y1="635" x2="370" y2="635"/>
+    <line x1="570" y1="635" x2="630" y2="635"/>
+    <line x1="830" y1="635" x2="890" y2="635"/>
+  </g>
+  <polyline points="1082,670 1082,725 118,725 118,670" fill="none" stroke="#4ade80" stroke-width="1.5" marker-end="url(#m-green)"/>
+  <text x="600" y="750" font-size="15" fill="#9ba3c4" text-anchor="middle">a change that is not re-measured on the same test set is a guess, not an optimization</text>
+
+  <!-- formulas -->
+  <text x="600" y="800" font-size="20" font-weight="600" fill="#eef1ff" text-anchor="middle">RAG quality = Retrieval × Context × Generation</text>
+  <text x="600" y="832" font-size="20" font-weight="600" fill="#eef1ff" text-anchor="middle">Production = Quality + Latency + Cost + Reliability</text>
+</svg>

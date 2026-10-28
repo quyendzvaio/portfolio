@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" width="1200" height="560" font-family="Inter, Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="m-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/>
+    </marker>
+    <marker id="m-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#a78bfa"/>
+    </marker>
+    <marker id="m-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f0b429"/>
+    </marker>
+    <marker id="m-pink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff3ddc"/>
+    </marker>
+    <marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4ade80"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="560" rx="24" fill="#0b0d19"/>
+
+  <text x="40" y="44" font-size="24" font-weight="600" fill="#eef1ff">Hybrid retrieval: wide net, then a precise cut</text>
+
+  <!-- legend -->
+  <circle cx="762" cy="39" r="6" fill="#22d3ee"/>
+  <text x="774" y="44" font-size="15" fill="#9ba3c4">sparse</text>
+  <circle cx="842" cy="39" r="6" fill="#a78bfa"/>
+  <text x="854" y="44" font-size="15" fill="#9ba3c4">dense</text>
+  <circle cx="918" cy="39" r="6" fill="#f0b429"/>
+  <text x="930" y="44" font-size="15" fill="#9ba3c4">fusion</text>
+  <circle cx="998" cy="39" r="6" fill="#ff3ddc"/>
+  <text x="1010" y="44" font-size="15" fill="#9ba3c4">rerank</text>
+  <circle cx="1082" cy="39" r="6" fill="#4ade80"/>
+  <text x="1094" y="44" font-size="15" fill="#9ba3c4">output</text>
+
+  <!-- query -->
+  <rect x="40" y="230" width="150" height="70" rx="12" fill="#11142a" stroke="#eef1ff" stroke-width="1.5"/>
+  <text x="115" y="260" font-size="18" fill="#eef1ff" text-anchor="middle">Query</text>
+  <text x="115" y="284" font-size="15" fill="#9ba3c4" text-anchor="middle">+ rewrites, HyDE</text>
+
+  <!-- query -> retrievers -->
+  <polyline points="190,265 235,265 235,160 280,160" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#m-cyan)"/>
+  <polyline points="190,265 235,265 235,380 280,380" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#m-violet)"/>
+
+  <!-- sparse retriever -->
+  <rect x="280" y="120" width="200" height="80" rx="12" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="380" y="152" font-size="18" fill="#eef1ff" text-anchor="middle">BM25 (sparse)</text>
+  <text x="380" y="178" font-size="15" fill="#9ba3c4" text-anchor="middle">exact terms, IDs, codes</text>
+
+  <!-- metadata filter -->
+  <rect x="280" y="250" width="200" height="60" rx="12" fill="#11142a" stroke="#9ba3c4" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="380" y="275" font-size="16" fill="#eef1ff" text-anchor="middle">Metadata filter</text>
+  <text x="380" y="297" font-size="15" fill="#9ba3c4" text-anchor="middle">tenant, ACL, date, type</text>
+
+  <!-- dense retriever -->
+  <rect x="280" y="340" width="200" height="80" rx="12" fill="#11142a" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="380" y="372" font-size="18" fill="#eef1ff" text-anchor="middle">Dense (vector)</text>
+  <text x="380" y="398" font-size="15" fill="#9ba3c4" text-anchor="middle">meaning, synonyms</text>
+
+  <!-- retrievers -> fusion -->
+  <polyline points="480,160 525,160 525,255 570,255" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#m-cyan)"/>
+  <polyline points="480,380 525,380 525,285 570,285" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#m-violet)"/>
+  <text x="505" y="146" font-size="15" fill="#9ba3c4" text-anchor="middle">top 50</text>
+  <text x="505" y="404" font-size="15" fill="#9ba3c4" text-anchor="middle">top 50</text>
+
+  <!-- fusion -->
+  <rect x="570" y="230" width="200" height="80" rx="12" fill="#11142a" stroke="#f0b429" stroke-width="1.5"/>
+  <text x="670" y="262" font-size="18" fill="#eef1ff" text-anchor="middle">RRF fusion</text>
+  <text x="670" y="288" font-size="15" fill="#9ba3c4" text-anchor="middle">sum 1/(k + rank), k=60</text>
+
+  <!-- fusion -> rerank -->
+  <line x1="770" y1="270" x2="860" y2="270" stroke="#f0b429" stroke-width="1.5" marker-end="url(#m-amber)"/>
+  <text x="815" y="258" font-size="15" fill="#9ba3c4" text-anchor="middle">~80 unique</text>
+
+  <!-- reranker -->
+  <rect x="860" y="230" width="200" height="80" rx="12" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+  <text x="960" y="262" font-size="18" fill="#eef1ff" text-anchor="middle">Cross-encoder</text>
+  <text x="960" y="288" font-size="15" fill="#9ba3c4" text-anchor="middle">scores (q, chunk) pairs</text>
+
+  <!-- rerank -> output -->
+  <line x1="960" y1="310" x2="960" y2="400" stroke="#ff3ddc" stroke-width="1.5" marker-end="url(#m-pink)"/>
+  <text x="975" y="360" font-size="15" fill="#9ba3c4">keep top 5</text>
+
+  <!-- output -->
+  <rect x="860" y="400" width="200" height="70" rx="12" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="960" y="430" font-size="18" fill="#eef1ff" text-anchor="middle">Context to LLM</text>
+  <text x="960" y="454" font-size="15" fill="#9ba3c4" text-anchor="middle">ordered, deduplicated</text>
+
+  <!-- footnote -->
+  <text x="600" y="520" font-size="15" fill="#9ba3c4" text-anchor="middle">Retrieve wide (50 + 50) and cheap, fuse by rank, rerank narrow and expensive, keep 5. The reranker never sees the whole corpus.</text>
+</svg>

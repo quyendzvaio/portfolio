@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getIndex, syncIndex } from '../lib/store'
 import { retrieve, rerank, fallbackAnswer } from '../lib/rag'
 import { apiConfigured, askChat, getChatStatus } from '../lib/api'
+import { useLang, useT } from '../lib/i18n'
 
 interface Msg { role: 'user' | 'ai'; text: string }
 
@@ -9,6 +10,8 @@ interface Msg { role: 'user' | 'ai'; text: string }
 const answers = new Map<string, string>()
 
 export default function ChatBox() {
+  const lang = useLang()
+  const t = useT()
   const [log, setLog] = useState<Msg[]>([])
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
@@ -37,17 +40,17 @@ export default function ChatBox() {
     // The model is only called when it has something to ground on: with no hits the
     // local "not found" answer is the right one and costs nothing. Repeated questions
     // in this visit reuse their answer.
-    const key = `${query.toLowerCase()}\u0000${hits.map((h) => h.id).join(',')}`
+    const key = `${lang}\u0000${query.toLowerCase()}\u0000${hits.map((h) => h.id).join(',')}`
     try {
       const answer = !llmEnabled || !hits.length
         ? fallbackAnswer(query, hits)
-        : answers.get(key) ?? (await askChat(query, hits)).answer
+        : answers.get(key) ?? (await askChat(query, hits, lang)).answer
       if (llmEnabled && hits.length) answers.set(key, answer)
       setLog((l) => [...l, { role: 'ai', text: answer }])
     } catch (e) {
       setLog((l) => [...l, {
         role: 'ai',
-        text: `Chat error: ${(e as Error).message}. Showing retrieval instead.\n\n${fallbackAnswer(query, hits)}`,
+        text: `${t('chat.error', { msg: (e as Error).message })}\n\n${fallbackAnswer(query, hits)}`,
       }])
     } finally {
       setBusy(false)
@@ -58,9 +61,9 @@ export default function ChatBox() {
     <div className="chat">
       {llmEnabled === false && (
         <p className="muted small">
-          The backend has no OpenRouter key set — running in retrieval-only mode.{' '}
-          <button onClick={() => { syncIndex(); setLog((l) => [...l, { role: 'ai', text: 'Index synced. Ask again.' }]) }}>
-            Sync index
+          {t('chat.noKey')}{' '}
+          <button onClick={() => { syncIndex(); setLog((l) => [...l, { role: 'ai', text: t('chat.synced') }]) }}>
+            {t('chat.sync')}
           </button>
         </p>
       )}
@@ -74,10 +77,10 @@ export default function ChatBox() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && send()}
-          placeholder="Ask about the owner, skills, or blog posts…"
-          aria-label="Ask about this portfolio"
+          placeholder={t('chat.placeholder')}
+          aria-label={t('chat.label')}
         />
-        <button onClick={send} disabled={busy}>{busy ? '…' : 'Send'}</button>
+        <button onClick={send} disabled={busy}>{busy ? '…' : t('chat.send')}</button>
       </div>
     </div>
   )

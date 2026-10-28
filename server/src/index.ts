@@ -392,8 +392,9 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     if (rateLimited(`chat:${clientIp(req)}`, env.limits.chatPerWindow, env.limits.windowMs)) {
       throw new HttpError(429, 'Too many questions from this address. Try again in a few minutes.')
     }
-    const input = await readJson<{ query?: string; context?: { source?: string; text?: string }[] }>(req)
+    const input = await readJson<{ query?: string; lang?: string; context?: { source?: string; text?: string }[] }>(req)
     const query = clean(input.query, 1000)
+    const lang = input.lang === 'vi' ? 'vi' : 'en'
     if (!query) throw new HttpError(400, 'Question cannot be empty')
     // This endpoint is public and bills the owner's OpenRouter account, so the
     // context the client sends is clamped rather than trusted.
@@ -403,13 +404,13 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         source: clean(chunk?.source, 200),
         text: clean(chunk?.text, MAX_CONTEXT_CHARS),
       }))
-    const key = createHash('sha256').update(JSON.stringify([query.toLowerCase(), context])).digest('hex')
+    const key = createHash('sha256').update(JSON.stringify([query.toLowerCase(), lang, context])).digest('hex')
     const cached = answers.get(key)
     if (cached && Date.now() - cached.at < ANSWER_TTL_MS) {
       json(res, 200, { answer: cached.answer, cached: true })
       return
     }
-    const answer = await ask(query, context).catch((error: unknown) => {
+    const answer = await ask(query, context, lang).catch((error: unknown) => {
       // A provider timeout is an expected outcome: one log line, and the client
       // falls back to raw retrieval.
       if (error instanceof DOMException && error.name === 'TimeoutError') {

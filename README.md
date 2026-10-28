@@ -7,7 +7,7 @@ that owns comments, admin login and the LLM call.
 
 | Piece | Lives where | How it changes |
 | --- | --- | --- |
-| Blog posts | `src/content/*.md`, committed to git | Bundled at build time. Add/edit/delete = commit, push, redeploy. |
+| Blog posts | `src/content/<slug>.md` + `<slug>.vi.md`, committed to git | Bundled at build time. Add/edit/delete = commit, push, redeploy. |
 | Comments | Vercel Blob, one JSON object per comment | Via the backend. Anonymous; a thread on screen re-checks every 5–30 s. |
 | Admin login | `ADMIN_PASSWORD` → signed session token | Session token in `sessionStorage`; the GitHub write credential stays server-side. |
 | RAG retrieval | Browser (`src/lib/rag.ts`) | TF-IDF + parent/child chunking, no vector DB. |
@@ -27,9 +27,10 @@ hand, or from `#/admin`, which commits the file for you.
 | `name`, `role`, `intro` | Hero headline, role line, intro paragraph; also the browser tab title |
 | `avatar` | The 3D portrait. An `https://` URL, or a file in `public/` such as `avatar.webp` (the default) |
 | `available` | The status badge above your name. Empty hides it |
-| `skills` | The rotating word after your role, the first three as chips around the portrait, and the scrolling strip |
+| `skills` | The Skills section, and the first three as chips around the portrait |
 | `stats` | Up to four highlight numbers (`{ "value": "3+", "label": "years shipping ML" }`). A leading number counts up |
 | `linkedin`, `phone`, `gmail`, `links` | Contact icons in the hero and footer |
+| `vi` | Vietnamese `name`, `role`, `intro`, `available` for the VI side of the language switch. A missing one shows the English text |
 
 A section whose field is empty doesn't render. The chat also indexes these fields, so
 it can answer questions about your skills. To swap the photo without the admin panel,
@@ -38,10 +39,19 @@ replace `public/avatar.webp` (a 4:5 crop of about 720×900 works best).
 Visitors can turn animations off from the footer. The site starts with motion off
 when the OS asks for reduced motion.
 
+The EN/VI switch in the nav changes the interface (`src/lib/i18n.ts`), the profile text
+(`vi` above) and the posts, and the chat answers in the chosen language. The admin
+panel stays in English and edits the English profile only; edit `vi` by hand.
+
 ## Blog
 
-Add/edit/delete `src/content/*.md` and push. Frontmatter: `title/date/tags/summary`.
-Slug comes from the filename. Posts are **not** editable from the admin panel by
+Add/edit/delete `src/content/<slug>.md` (English) and `src/content/<slug>.vi.md`
+(Vietnamese) and push. Frontmatter: `title/date/tags/summary`. Slug comes from the
+filename; both copies share it, so a post keeps one URL and one comment thread. A post
+without a `.vi.md` shows its English copy on the VI side. A leading `# <title>` line is
+dropped because the page already shows the title. The renderer (`src/lib/markdown.ts`)
+supports `#`–`####` headings, flat lists, fenced code, tables, `>` quotes, images
+(`![alt](blog/x.svg)`, files in `public/blog/`), bold, italic, code and links. Posts are **not** editable from the admin panel by
 design — the repo is the source of truth, so there is no state that exists in only
 one browser.
 

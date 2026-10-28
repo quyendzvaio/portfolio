@@ -1,0 +1,189 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="1200" height="900" font-family="Inter, Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arrow-muted" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1,1 L11,6 L1,11 z" fill="#9ba3c4"/>
+    </marker>
+    <marker id="arrow-cyan" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1,1 L11,6 L1,11 z" fill="#22d3ee"/>
+    </marker>
+    <marker id="arrow-pink" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1,1 L11,6 L1,11 z" fill="#ff3ddc"/>
+    </marker>
+    <marker id="arrow-violet" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1,1 L11,6 L1,11 z" fill="#a78bfa"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1,1 L11,6 L1,11 z" fill="#4ade80"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1,1 L11,6 L1,11 z" fill="#f0b429"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="900" rx="24" fill="#0b0d19"/>
+  <text x="52" y="56" font-size="18" fill="#9ba3c4">LangGraph StateGraph</text>
+  <text x="1035" y="56" font-size="18" fill="#9ba3c4" text-anchor="middle">Tools via MCP</text>
+
+  <!-- START -->
+  <rect x="390" y="30" width="100" height="40" rx="20" fill="#11142a" stroke="#9ba3c4" stroke-width="1.5"/>
+  <text x="440" y="56" font-size="18" fill="#eef1ff" text-anchor="middle">START</text>
+  <line x1="440" y1="70" x2="440" y2="100" stroke="#9ba3c4" stroke-width="2" marker-end="url(#arrow-muted)"/>
+
+  <!-- guardrail -->
+  <rect x="340" y="100" width="200" height="56" rx="10" fill="#11142a" stroke="#f0b429" stroke-width="1.5"/>
+  <text x="440" y="124" font-size="18" fill="#eef1ff" text-anchor="middle">guardrail</text>
+  <text x="440" y="146" font-size="15" fill="#9ba3c4" text-anchor="middle">PII, injection, abuse</text>
+  <line x1="440" y1="156" x2="440" y2="196" stroke="#a78bfa" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-violet)"/>
+  <text x="450" y="180" font-size="15" fill="#9ba3c4">ok</text>
+  <!-- blocked -> respond -->
+  <path d="M540,128 H860 V668 H540" fill="none" stroke="#a78bfa" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-violet)"/>
+  <text x="700" y="120" font-size="15" fill="#9ba3c4" text-anchor="middle">blocked</text>
+
+  <!-- router -->
+  <rect x="340" y="196" width="200" height="56" rx="10" fill="#11142a" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="440" y="220" font-size="18" fill="#eef1ff" text-anchor="middle">router</text>
+  <text x="440" y="242" font-size="15" fill="#9ba3c4" text-anchor="middle">LLM picks intent</text>
+
+  <!-- router -> branches (conditional edges) -->
+  <line x1="440" y1="252" x2="120" y2="320" stroke="#a78bfa" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-violet)"/>
+  <line x1="440" y1="252" x2="280" y2="320" stroke="#a78bfa" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-violet)"/>
+  <line x1="440" y1="252" x2="440" y2="320" stroke="#a78bfa" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-violet)"/>
+  <line x1="440" y1="252" x2="600" y2="320" stroke="#a78bfa" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-violet)"/>
+  <line x1="440" y1="252" x2="760" y2="320" stroke="#a78bfa" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-violet)"/>
+
+  <!-- Branch row -->
+  <rect x="52" y="320" width="136" height="56" rx="10" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="120" y="344" font-size="18" fill="#eef1ff" text-anchor="middle">order_agent</text>
+  <text x="120" y="366" font-size="15" fill="#9ba3c4" text-anchor="middle">order_status</text>
+
+  <rect x="212" y="320" width="136" height="56" rx="10" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+  <text x="280" y="344" font-size="18" fill="#eef1ff" text-anchor="middle">refund_check</text>
+  <text x="280" y="366" font-size="15" fill="#9ba3c4" text-anchor="middle">refund</text>
+
+  <rect x="372" y="320" width="136" height="56" rx="10" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="440" y="344" font-size="18" fill="#eef1ff" text-anchor="middle">retrieve_docs</text>
+  <text x="440" y="366" font-size="15" fill="#9ba3c4" text-anchor="middle">policy_question</text>
+
+  <rect x="532" y="320" width="136" height="56" rx="10" fill="#11142a" stroke="#f0b429" stroke-width="1.5"/>
+  <text x="600" y="344" font-size="18" fill="#eef1ff" text-anchor="middle">summarize</text>
+  <text x="600" y="366" font-size="15" fill="#9ba3c4" text-anchor="middle">escalate</text>
+
+  <rect x="692" y="320" width="136" height="56" rx="10" fill="#11142a" stroke="#9ba3c4" stroke-width="1.5"/>
+  <text x="760" y="344" font-size="18" fill="#eef1ff" text-anchor="middle">small_talk</text>
+  <text x="760" y="366" font-size="15" fill="#9ba3c4" text-anchor="middle">off-topic too</text>
+
+  <!-- Order branch: agent <-> tools loop -->
+  <line x1="112" y1="376" x2="112" y2="420" stroke="#a78bfa" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-violet)"/>
+  <text x="104" y="402" font-size="15" fill="#9ba3c4" text-anchor="end">tool call</text>
+  <line x1="148" y1="420" x2="148" y2="376" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrow-cyan)"/>
+  <text x="156" y="402" font-size="15" fill="#9ba3c4">result</text>
+  <rect x="52" y="420" width="136" height="56" rx="10" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="120" y="444" font-size="18" fill="#eef1ff" text-anchor="middle">order_tools</text>
+  <text x="120" y="466" font-size="15" fill="#9ba3c4" text-anchor="middle">ToolNode · MCP</text>
+  <!-- order_agent -> respond (no tool calls) -->
+  <path d="M52,348 H28 V625 H362 V640" fill="none" stroke="#a78bfa" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-violet)"/>
+  <text x="36" y="612" font-size="15" fill="#9ba3c4">no tool calls</text>
+
+  <!-- Refund branch -->
+  <line x1="280" y1="376" x2="280" y2="420" stroke="#a78bfa" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-violet)"/>
+  <text x="288" y="402" font-size="15" fill="#9ba3c4">&gt; limit</text>
+  <rect x="212" y="420" width="136" height="56" rx="10" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="280" y="444" font-size="18" fill="#eef1ff" text-anchor="middle">human_review</text>
+  <text x="280" y="466" font-size="15" fill="#9ba3c4" text-anchor="middle">interrupt()</text>
+  <!-- refund_check -> issue_refund (small amount, skip review) -->
+  <path d="M348,360 H360 V548 H348" fill="none" stroke="#a78bfa" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-violet)"/>
+  <!-- human_review -> issue_refund -->
+  <line x1="280" y1="476" x2="280" y2="520" stroke="#a78bfa" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-violet)"/>
+  <text x="288" y="502" font-size="15" fill="#9ba3c4">approved</text>
+  <!-- human_review -> respond (rejected) -->
+  <path d="M212,462 H200 V595 H414 V640" fill="none" stroke="#a78bfa" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-violet)"/>
+  <text x="192" y="540" font-size="15" fill="#9ba3c4" text-anchor="end">rejected</text>
+  <rect x="212" y="520" width="136" height="56" rx="10" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+  <text x="280" y="544" font-size="18" fill="#eef1ff" text-anchor="middle">issue_refund</text>
+  <text x="280" y="566" font-size="15" fill="#9ba3c4" text-anchor="middle">refund API · MCP</text>
+  <path d="M280,576 V610 H388 V640" fill="none" stroke="#ff3ddc" stroke-width="2" marker-end="url(#arrow-pink)"/>
+
+  <!-- RAG branch -->
+  <line x1="440" y1="376" x2="440" y2="420" stroke="#4ade80" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <rect x="372" y="420" width="136" height="56" rx="10" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="440" y="444" font-size="18" fill="#eef1ff" text-anchor="middle">rag_answer</text>
+  <text x="440" y="466" font-size="15" fill="#9ba3c4" text-anchor="middle">grounded answer</text>
+  <line x1="440" y1="476" x2="440" y2="640" stroke="#4ade80" stroke-width="2" marker-end="url(#arrow-green)"/>
+
+  <!-- Escalation branch -->
+  <line x1="600" y1="376" x2="600" y2="420" stroke="#f0b429" stroke-width="2" marker-end="url(#arrow-amber)"/>
+  <rect x="532" y="420" width="136" height="56" rx="10" fill="#11142a" stroke="#f0b429" stroke-width="1.5"/>
+  <text x="600" y="444" font-size="18" fill="#eef1ff" text-anchor="middle">create_ticket</text>
+  <text x="600" y="466" font-size="15" fill="#9ba3c4" text-anchor="middle">CRM · MCP</text>
+  <path d="M600,476 V600 H478 V640" fill="none" stroke="#f0b429" stroke-width="2" marker-end="url(#arrow-amber)"/>
+
+  <!-- Small talk -> respond -->
+  <path d="M760,376 V620 H516 V640" fill="none" stroke="#9ba3c4" stroke-width="2" marker-end="url(#arrow-muted)"/>
+
+  <!-- respond -->
+  <rect x="340" y="640" width="200" height="56" rx="10" fill="#11142a" stroke="#f0b429" stroke-width="1.5"/>
+  <text x="440" y="664" font-size="18" fill="#eef1ff" text-anchor="middle">respond</text>
+  <text x="440" y="686" font-size="15" fill="#9ba3c4" text-anchor="middle">safety check, then reply</text>
+  <line x1="440" y1="696" x2="440" y2="740" stroke="#9ba3c4" stroke-width="2" marker-end="url(#arrow-muted)"/>
+
+  <!-- END -->
+  <rect x="390" y="740" width="100" height="40" rx="20" fill="#11142a" stroke="#9ba3c4" stroke-width="1.5"/>
+  <text x="440" y="766" font-size="18" fill="#eef1ff" text-anchor="middle">END</text>
+
+  <!-- checkpointer -->
+  <rect x="52" y="710" width="248" height="56" rx="10" fill="#11142a" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="176" y="734" font-size="18" fill="#eef1ff" text-anchor="middle">checkpointer</text>
+  <text x="176" y="756" font-size="15" fill="#9ba3c4" text-anchor="middle">thread_id = conversation</text>
+  <text x="52" y="790" font-size="15" fill="#9ba3c4">state saved after every node; resume after interrupt</text>
+
+  <!-- MCP column -->
+  <rect x="900" y="100" width="270" height="100" rx="10" fill="#11142a" stroke="#9ba3c4" stroke-width="1.5"/>
+  <text x="1035" y="134" font-size="18" fill="#eef1ff" text-anchor="middle">MCP host = this app</text>
+  <text x="1035" y="160" font-size="15" fill="#9ba3c4" text-anchor="middle">langchain.mcp MCPAdapter</text>
+  <text x="1035" y="182" font-size="15" fill="#9ba3c4" text-anchor="middle">tools become LangChain tools</text>
+  <line x1="920" y1="200" x2="920" y2="280" stroke="#9ba3c4" stroke-width="2" marker-end="url(#arrow-muted)"/>
+  <text x="1035" y="262" font-size="15" fill="#9ba3c4" text-anchor="middle">tools/list · tools/call</text>
+
+  <rect x="900" y="280" width="80" height="340" rx="10" fill="#11142a" stroke="#9ba3c4" stroke-width="1.5"/>
+  <text x="940" y="440" font-size="18" fill="#eef1ff" text-anchor="middle">MCP</text>
+  <text x="940" y="462" font-size="18" fill="#eef1ff" text-anchor="middle">clients</text>
+  <text x="940" y="486" font-size="15" fill="#9ba3c4" text-anchor="middle">1/server</text>
+
+  <line x1="980" y1="312" x2="1040" y2="312" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrow-cyan)"/>
+  <rect x="1040" y="280" width="130" height="64" rx="10" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="1105" y="306" font-size="18" fill="#eef1ff" text-anchor="middle">orders</text>
+  <text x="1105" y="328" font-size="15" fill="#9ba3c4" text-anchor="middle">get_order</text>
+
+  <line x1="980" y1="404" x2="1040" y2="404" stroke="#ff3ddc" stroke-width="2" marker-end="url(#arrow-pink)"/>
+  <rect x="1040" y="372" width="130" height="64" rx="10" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+  <text x="1105" y="398" font-size="18" fill="#eef1ff" text-anchor="middle">refunds</text>
+  <text x="1105" y="420" font-size="15" fill="#9ba3c4" text-anchor="middle">issue_refund</text>
+
+  <line x1="980" y1="496" x2="1040" y2="496" stroke="#f0b429" stroke-width="2" marker-end="url(#arrow-amber)"/>
+  <rect x="1040" y="464" width="130" height="64" rx="10" fill="#11142a" stroke="#f0b429" stroke-width="1.5"/>
+  <text x="1105" y="490" font-size="18" fill="#eef1ff" text-anchor="middle">crm</text>
+  <text x="1105" y="512" font-size="15" fill="#9ba3c4" text-anchor="middle">create_ticket</text>
+
+  <line x1="980" y1="588" x2="1040" y2="588" stroke="#9ba3c4" stroke-width="2" marker-end="url(#arrow-muted)"/>
+  <rect x="1040" y="556" width="130" height="64" rx="10" fill="#11142a" stroke="#9ba3c4" stroke-width="1.5"/>
+  <text x="1105" y="582" font-size="18" fill="#eef1ff" text-anchor="middle">email</text>
+  <text x="1105" y="604" font-size="15" fill="#9ba3c4" text-anchor="middle">send_email</text>
+
+  <text x="1035" y="660" font-size="15" fill="#9ba3c4" text-anchor="middle">each server runs the real API</text>
+  <text x="1035" y="682" font-size="15" fill="#9ba3c4" text-anchor="middle">result returns as a ToolMessage</text>
+
+  <!-- Legend -->
+  <rect x="52" y="820" width="14" height="14" fill="#22d3ee"/>
+  <text x="74" y="832" font-size="15" fill="#9ba3c4">order branch</text>
+  <rect x="200" y="820" width="14" height="14" fill="#ff3ddc"/>
+  <text x="222" y="832" font-size="15" fill="#9ba3c4">refund branch</text>
+  <rect x="360" y="820" width="14" height="14" fill="#4ade80"/>
+  <text x="382" y="832" font-size="15" fill="#9ba3c4">RAG branch</text>
+  <rect x="500" y="820" width="14" height="14" fill="#f0b429"/>
+  <text x="522" y="832" font-size="15" fill="#9ba3c4">guardrail / escalation</text>
+  <rect x="710" y="820" width="14" height="14" fill="#a78bfa"/>
+  <text x="732" y="832" font-size="15" fill="#9ba3c4">routing · checkpoint</text>
+  <text x="52" y="866" font-size="15" fill="#9ba3c4">dashed box = interrupt (human in the loop)</text>
+  <text x="420" y="866" font-size="15" fill="#9ba3c4">dashed arrow = conditional edge</text>
+  <text x="710" y="866" font-size="15" fill="#9ba3c4">· MCP = tool runs on an MCP server</text>
+</svg>

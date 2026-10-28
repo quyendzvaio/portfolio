@@ -1,6 +1,7 @@
 import { parseMd, type Frontmatter } from './markdown'
 import { chunkParentChild, type Chunk } from './rag'
 import profileJson from '../content/profile.json'
+import { getLang, type Lang } from './i18n'
 
 export interface Profile {
   name: string
@@ -18,10 +19,14 @@ export interface Profile {
   skills?: string[]
   /** Up to four headline numbers; a leading number counts up on screen. */
   stats?: { value: string; label: string }[]
+  /** Vietnamese text for the fields that are prose; anything missing falls back to English. */
+  vi?: Partial<Pick<Profile, 'name' | 'role' | 'intro' | 'available'>>
 }
 
 export interface Post {
   slug: string
+  /** The language this copy is written in; a post with no `.vi.md` shows its English copy. */
+  lang: Lang
   meta: Frontmatter
   body: string
   error?: string
@@ -40,26 +45,42 @@ const LS_INDEX = 'portfolio.index.v1'
 // git instead of here: a localStorage copy was only ever visible in the browser that
 // wrote it, so the owner would "save" a change and every visitor kept seeing the old
 // one. The deployed bundle is the single source of truth between deploys.
-export function getProfile(): Profile {
-  return profileJson as Profile
+export function getProfile(lang: Lang = getLang()): Profile {
+  const profile = profileJson as Profile
+  if (lang !== 'vi' || !profile.vi) return profile
+  const overrides = Object.fromEntries(Object.entries(profile.vi).filter(([, value]) => value))
+  return { ...profile, ...overrides }
 }
 
-export function getPosts(): Post[] {
-  const posts: Post[] = []
+// `<slug>.md` is the English copy and `<slug>.vi.md` the Vietnamese one; both share the
+// slug, so a post keeps one URL and one comment thread in either language.
+function postsByLang(): Map<string, Partial<Record<Lang, Post>>> {
+  const bySlug = new Map<string, Partial<Record<Lang, Post>>>()
   for (const [path, raw] of Object.entries(mdFiles)) {
-    const slug = path.split('/').pop()!.replace(/\.md$/, '')
-    posts.push({ slug, ...parseMd(raw as string) })
+    const file = path.split('/').pop()!
+    const lang: Lang = file.endsWith('.vi.md') ? 'vi' : 'en'
+    const slug = file.replace(/(\.vi)?\.md$/, '')
+    const copies = bySlug.get(slug) ?? {}
+    copies[lang] = { slug, lang, ...parseMd(raw as string) }
+    bySlug.set(slug, copies)
   }
+  return bySlug
+}
+const allPosts = postsByLang()
+
+export function getPosts(lang: Lang = getLang()): Post[] {
+  const posts = [...allPosts.values()].map((copies) => (copies[lang] ?? copies.en ?? copies.vi)!)
   return posts.sort((a, b) => (b.meta.date || '').localeCompare(a.meta.date || ''))
 }
 
 // Sync: rebuild the chunk index from current posts + profile, persist the timestamp.
+// One index per language, so a question is matched against the copy the reader sees.
 export interface IndexMeta { syncedAt: string; chunkCount: number; postCount: number }
-let cache: Chunk[] | null = null
+const cache = new Map<Lang, Chunk[]>()
 
-export function buildIndex(): Chunk[] {
+export function buildIndex(lang: Lang = getLang()): Chunk[] {
   const chunks: Chunk[] = []
-  const p = getProfile()
+  const p = getProfile(lang)
   const extras = [
     p.available ? `Availability: ${p.available}.` : '',
     p.skills?.length ? `Skills: ${p.skills.join(', ')}.` : '',
@@ -67,18 +88,19 @@ export function buildIndex(): Chunk[] {
   ].filter(Boolean).join(' ')
   chunks.push(...chunkParentChild('Profile', 'profile',
     `${p.name} ${p.role} ${p.intro} ${extras} Contact: LinkedIn ${p.linkedin}, phone ${p.phone}, email ${p.gmail}.`))
-  for (const post of getPosts()) {
+  const posts = getPosts(lang)
+  for (const post of posts) {
     if (post.error) continue
     chunks.push(...chunkParentChild(post.meta.title, post.slug, `${post.meta.title}. ${post.meta.summary}. ${post.body}`))
   }
-  cache = chunks
-  const meta: IndexMeta = { syncedAt: new Date().toISOString(), chunkCount: chunks.length, postCount: getPosts().length }
+  cache.set(lang, chunks)
+  const meta: IndexMeta = { syncedAt: new Date().toISOString(), chunkCount: chunks.length, postCount: posts.length }
   try { localStorage.setItem(LS_INDEX, JSON.stringify(meta)) } catch { /* ignore */ }
   return chunks
 }
 
-export function getIndex(): Chunk[] {
-  return cache ?? buildIndex()
+export function getIndex(lang: Lang = getLang()): Chunk[] {
+  return cache.get(lang) ?? buildIndex(lang)
 }
 
 export function syncIndex(): IndexMeta {

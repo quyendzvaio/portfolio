@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" width="1200" height="760" font-family="Inter, Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arrow-cyan" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/>
+    </marker>
+    <marker id="arrow-amber" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f0b429"/>
+    </marker>
+    <marker id="arrow-pink" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff3ddc"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4ade80"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="760" rx="24" fill="#0b0d19"/>
+
+  <text x="600" y="48" text-anchor="middle" font-size="26" font-weight="700" fill="#eef1ff">Agent = LLM + harness</text>
+  <text x="600" y="76" text-anchor="middle" font-size="16" fill="#9ba3c4">The model picks the next step. Everything else around it is the harness.</text>
+
+  <!-- top row: what the model sees and can do -->
+  <rect x="60" y="110" width="300" height="84" rx="14" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="210" y="146" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Instructions</text>
+  <text x="210" y="172" text-anchor="middle" font-size="15" fill="#9ba3c4">system prompt · AGENTS.md · done</text>
+
+  <rect x="450" y="110" width="300" height="84" rx="14" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="600" y="146" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Tools</text>
+  <text x="600" y="172" text-anchor="middle" font-size="15" fill="#9ba3c4">search · fetch · notes · via MCP</text>
+
+  <rect x="840" y="110" width="300" height="84" rx="14" fill="#11142a" stroke="#f0b429" stroke-width="1.5"/>
+  <text x="990" y="146" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Context manager</text>
+  <text x="990" y="172" text-anchor="middle" font-size="15" fill="#9ba3c4">compaction · notes · sub-agents</text>
+
+  <!-- middle row -->
+  <rect x="60" y="338" width="300" height="84" rx="14" fill="#11142a" stroke="#f0b429" stroke-width="1.5"/>
+  <text x="210" y="374" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">State / memory</text>
+  <text x="210" y="400" text-anchor="middle" font-size="15" fill="#9ba3c4">progress.json · notes.md · git</text>
+
+  <rect x="420" y="325" width="360" height="110" rx="16" fill="#11142a" stroke="#a78bfa" stroke-width="2"/>
+  <text x="600" y="362" text-anchor="middle" font-size="26" font-weight="700" fill="#eef1ff">LLM</text>
+  <text x="600" y="390" text-anchor="middle" font-size="15" fill="#9ba3c4">model weights: decides the next step</text>
+  <text x="600" y="416" text-anchor="middle" font-size="15" fill="#a78bfa">loop: call → tools → observe → repeat</text>
+
+  <rect x="840" y="338" width="300" height="84" rx="14" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+  <text x="990" y="374" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Environment &amp; sandbox</text>
+  <text x="990" y="400" text-anchor="middle" font-size="15" fill="#9ba3c4">allow-list · limits · versions</text>
+
+  <!-- bottom row -->
+  <rect x="60" y="566" width="300" height="84" rx="14" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+  <text x="210" y="602" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Permissions &amp; scope</text>
+  <text x="210" y="628" text-anchor="middle" font-size="15" fill="#9ba3c4">policy gate · one task at a time</text>
+
+  <rect x="450" y="566" width="300" height="84" rx="14" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="600" y="602" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Verification</text>
+  <text x="600" y="628" text-anchor="middle" font-size="15" fill="#9ba3c4">verifiers · tests · evaluator</text>
+
+  <rect x="840" y="566" width="300" height="84" rx="14" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="990" y="602" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Observability &amp; recovery</text>
+  <text x="990" y="628" text-anchor="middle" font-size="15" fill="#9ba3c4">trace.jsonl · evals · handoff</text>
+
+  <!-- arrows: each component feeds or constrains the model's next step -->
+  <line x1="300" y1="194" x2="470" y2="325" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+  <line x1="600" y1="194" x2="600" y2="325" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+  <line x1="900" y1="194" x2="730" y2="325" stroke="#f0b429" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+  <line x1="360" y1="380" x2="420" y2="380" stroke="#f0b429" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+  <line x1="840" y1="380" x2="780" y2="380" stroke="#ff3ddc" stroke-width="1.5" marker-end="url(#arrow-pink)"/>
+  <line x1="300" y1="566" x2="470" y2="435" stroke="#ff3ddc" stroke-width="1.5" marker-end="url(#arrow-pink)"/>
+  <line x1="600" y1="566" x2="600" y2="435" stroke="#4ade80" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <line x1="900" y1="566" x2="730" y2="435" stroke="#4ade80" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+
+  <!-- legend -->
+  <rect x="60" y="690" width="14" height="14" rx="3" fill="#22d3ee"/>
+  <text x="84" y="702" font-size="15" fill="#9ba3c4">model's inputs and tools</text>
+  <rect x="330" y="690" width="14" height="14" rx="3" fill="#f0b429"/>
+  <text x="354" y="702" font-size="15" fill="#9ba3c4">memory across steps</text>
+  <rect x="560" y="690" width="14" height="14" rx="3" fill="#ff3ddc"/>
+  <text x="584" y="702" font-size="15" fill="#9ba3c4">limits</text>
+  <rect x="680" y="690" width="14" height="14" rx="3" fill="#4ade80"/>
+  <text x="704" y="702" font-size="15" fill="#9ba3c4">feedback and evidence</text>
+  <rect x="930" y="690" width="14" height="14" rx="3" fill="#a78bfa"/>
+  <text x="954" y="702" font-size="15" fill="#9ba3c4">the model</text>
+  <text x="600" y="740" text-anchor="middle" font-size="15" fill="#9ba3c4">Arrows: what each part puts in front of the model, or enforces on its next step.</text>
+</svg>

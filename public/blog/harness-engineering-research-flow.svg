@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" width="1200" height="760" font-family="Inter, Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arrow-cyan" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/>
+    </marker>
+    <marker id="arrow-violet" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#a78bfa"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4ade80"/>
+    </marker>
+    <marker id="arrow-pink" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff3ddc"/>
+    </marker>
+    <marker id="arrow-muted" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9ba3c4"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="760" rx="24" fill="#0b0d19"/>
+
+  <text x="600" y="48" text-anchor="middle" font-size="26" font-weight="700" fill="#eef1ff">Research agent: flow and harness</text>
+  <text x="600" y="76" text-anchor="middle" font-size="16" fill="#9ba3c4">Top: what the model drives. Bottom: what the harness enforces at every step.</text>
+
+  <!-- row 1: the agent's flow -->
+  <rect x="40" y="120" width="150" height="70" rx="12" fill="#11142a" stroke="#9ba3c4" stroke-width="1.5"/>
+  <text x="115" y="150" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Question</text>
+  <text x="115" y="174" text-anchor="middle" font-size="15" fill="#9ba3c4">from user</text>
+
+  <rect x="230" y="120" width="170" height="70" rx="12" fill="#11142a" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="315" y="150" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Plan</text>
+  <text x="315" y="174" text-anchor="middle" font-size="15" fill="#9ba3c4">sub-questions</text>
+
+  <!-- research loop group -->
+  <rect x="440" y="85" width="480" height="155" rx="14" fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="6 6"/>
+  <text x="452" y="105" font-size="15" fill="#9ba3c4">research loop · until each sub-question has 2+ sources</text>
+
+  <rect x="460" y="120" width="120" height="70" rx="12" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="520" y="150" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Search</text>
+  <text x="520" y="174" text-anchor="middle" font-size="15" fill="#9ba3c4">candidates</text>
+
+  <rect x="620" y="120" width="120" height="70" rx="12" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="680" y="150" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Fetch</text>
+  <text x="680" y="174" text-anchor="middle" font-size="15" fill="#9ba3c4">clean text</text>
+
+  <rect x="780" y="120" width="120" height="70" rx="12" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="840" y="150" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Note</text>
+  <text x="840" y="174" text-anchor="middle" font-size="15" fill="#9ba3c4">claim + quote</text>
+
+  <rect x="960" y="120" width="200" height="70" rx="12" fill="#11142a" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="1060" y="150" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Synthesize</text>
+  <text x="1060" y="174" text-anchor="middle" font-size="15" fill="#9ba3c4">draft with [n]</text>
+
+  <!-- row 2: verification and output -->
+  <rect x="960" y="300" width="200" height="70" rx="12" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="1060" y="330" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Verify</text>
+  <text x="1060" y="354" text-anchor="middle" font-size="15" fill="#9ba3c4">citations · structure</text>
+
+  <rect x="960" y="440" width="200" height="70" rx="12" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="1060" y="470" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Report</text>
+  <text x="1060" y="494" text-anchor="middle" font-size="15" fill="#9ba3c4">report.md</text>
+
+  <!-- flow arrows -->
+  <line x1="190" y1="155" x2="230" y2="155" stroke="#9ba3c4" stroke-width="1.5" marker-end="url(#arrow-muted)"/>
+  <line x1="400" y1="155" x2="440" y2="155" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+  <line x1="580" y1="155" x2="620" y2="155" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+  <line x1="740" y1="155" x2="780" y2="155" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+  <path d="M840,190 V218 H520 V190" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+  <text x="680" y="213" text-anchor="middle" font-size="15" fill="#9ba3c4">repeat</text>
+  <line x1="920" y1="155" x2="960" y2="155" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+
+  <line x1="985" y1="190" x2="985" y2="300" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+  <text x="975" y="250" text-anchor="end" font-size="15" fill="#9ba3c4">draft</text>
+  <line x1="1135" y1="300" x2="1135" y2="190" stroke="#4ade80" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <text x="1145" y="250" font-size="15" fill="#9ba3c4">fail</text>
+  <text x="1060" y="270" text-anchor="middle" font-size="15" fill="#9ba3c4">with fix hints</text>
+
+  <line x1="1060" y1="370" x2="1060" y2="440" stroke="#4ade80" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <text x="1070" y="410" font-size="15" fill="#9ba3c4">pass</text>
+
+  <!-- the harness -->
+  <rect x="40" y="540" width="1120" height="160" rx="14" fill="none" stroke="#ff3ddc" stroke-width="1.5" stroke-dasharray="6 6"/>
+  <text x="52" y="562" font-size="15" fill="#9ba3c4">harness/ · independent of the model</text>
+
+  <rect x="64" y="580" width="196" height="80" rx="12" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+  <text x="162" y="612" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Policy gate</text>
+  <text x="162" y="638" text-anchor="middle" font-size="15" fill="#9ba3c4">allowed? domain? count</text>
+
+  <rect x="284" y="580" width="196" height="80" rx="12" fill="#11142a" stroke="#f0b429" stroke-width="1.5"/>
+  <text x="382" y="612" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Context manager</text>
+  <text x="382" y="638" text-anchor="middle" font-size="15" fill="#9ba3c4">clear → summarize</text>
+
+  <rect x="504" y="580" width="196" height="80" rx="12" fill="#11142a" stroke="#f0b429" stroke-width="1.5"/>
+  <text x="602" y="612" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">State</text>
+  <text x="602" y="638" text-anchor="middle" font-size="15" fill="#9ba3c4">progress.json · notes</text>
+
+  <rect x="724" y="580" width="196" height="80" rx="12" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="822" y="612" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Tracing &amp; budget</text>
+  <text x="822" y="638" text-anchor="middle" font-size="15" fill="#9ba3c4">trace.jsonl · stop</text>
+
+  <rect x="944" y="580" width="196" height="80" rx="12" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="1042" y="612" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Verifiers &amp; evals</text>
+  <text x="1042" y="638" text-anchor="middle" font-size="15" fill="#9ba3c4">citations · pass^k</text>
+
+  <!-- the harness governs every step of the loop -->
+  <line x1="600" y1="540" x2="600" y2="240" stroke="#ff3ddc" stroke-width="1.5" marker-end="url(#arrow-pink)"/>
+  <text x="615" y="380" font-size="15" fill="#9ba3c4">every step: gate the tool call</text>
+  <text x="615" y="402" font-size="15" fill="#9ba3c4">compact when over the threshold</text>
+  <text x="615" y="424" font-size="15" fill="#9ba3c4">save progress · trace · stop on budget</text>
+
+  <!-- legend -->
+  <rect x="40" y="722" width="14" height="14" rx="3" fill="#a78bfa"/>
+  <text x="64" y="734" font-size="15" fill="#9ba3c4">model decides</text>
+  <rect x="230" y="722" width="14" height="14" rx="3" fill="#22d3ee"/>
+  <text x="254" y="734" font-size="15" fill="#9ba3c4">tools</text>
+  <rect x="340" y="722" width="14" height="14" rx="3" fill="#4ade80"/>
+  <text x="364" y="734" font-size="15" fill="#9ba3c4">verification and evidence</text>
+  <rect x="600" y="722" width="14" height="14" rx="3" fill="#f0b429"/>
+  <text x="624" y="734" font-size="15" fill="#9ba3c4">memory</text>
+  <rect x="720" y="722" width="14" height="14" rx="3" fill="#ff3ddc"/>
+  <text x="744" y="734" font-size="15" fill="#9ba3c4">guardrails</text>
+</svg>

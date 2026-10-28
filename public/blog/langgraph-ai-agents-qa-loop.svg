@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" width="1200" height="520" font-family="Inter, Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arrow-muted" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1,1 L11,6 L1,11 z" fill="#9ba3c4"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1,1 L11,6 L1,11 z" fill="#4ade80"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1,1 L11,6 L1,11 z" fill="#f0b429"/>
+    </marker>
+    <marker id="arrow-violet" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1,1 L11,6 L1,11 z" fill="#a78bfa"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="520" rx="24" fill="#0b0d19"/>
+  <text x="60" y="60" font-size="18" fill="#9ba3c4">Document Q&amp;A with a retry loop (LangGraph StateGraph)</text>
+
+  <!-- START -->
+  <rect x="60" y="200" width="100" height="40" rx="20" fill="#11142a" stroke="#9ba3c4" stroke-width="1.5"/>
+  <text x="110" y="226" font-size="18" fill="#eef1ff" text-anchor="middle">START</text>
+  <line x1="160" y1="220" x2="220" y2="220" stroke="#9ba3c4" stroke-width="2" marker-end="url(#arrow-muted)"/>
+
+  <!-- retrieve -->
+  <rect x="220" y="180" width="160" height="80" rx="10" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="300" y="214" font-size="18" fill="#eef1ff" text-anchor="middle">retrieve</text>
+  <text x="300" y="240" font-size="15" fill="#9ba3c4" text-anchor="middle">vector search</text>
+  <line x1="380" y1="220" x2="440" y2="220" stroke="#4ade80" stroke-width="2" marker-end="url(#arrow-green)"/>
+
+  <!-- grade -->
+  <rect x="440" y="180" width="160" height="80" rx="10" fill="#11142a" stroke="#f0b429" stroke-width="1.5"/>
+  <text x="520" y="214" font-size="18" fill="#eef1ff" text-anchor="middle">grade</text>
+  <text x="520" y="240" font-size="15" fill="#9ba3c4" text-anchor="middle">LLM: enough?</text>
+
+  <!-- grade -> answer (conditional) -->
+  <line x1="600" y1="220" x2="680" y2="220" stroke="#a78bfa" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-violet)"/>
+  <text x="640" y="170" font-size="15" fill="#9ba3c4" text-anchor="middle">good enough / 3 tries</text>
+
+  <!-- grade -> rewrite (conditional) -->
+  <line x1="520" y1="260" x2="520" y2="340" stroke="#a78bfa" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-violet)"/>
+  <text x="530" y="306" font-size="15" fill="#9ba3c4">not enough</text>
+
+  <!-- rewrite -->
+  <rect x="440" y="340" width="160" height="80" rx="10" fill="#11142a" stroke="#f0b429" stroke-width="1.5"/>
+  <text x="520" y="374" font-size="18" fill="#eef1ff" text-anchor="middle">rewrite</text>
+  <text x="520" y="400" font-size="15" fill="#9ba3c4" text-anchor="middle">LLM rewrites query</text>
+
+  <!-- rewrite -> retrieve (loop back) -->
+  <path d="M440,380 H300 V260" fill="none" stroke="#f0b429" stroke-width="2" marker-end="url(#arrow-amber)"/>
+  <text x="370" y="372" font-size="15" fill="#9ba3c4" text-anchor="middle">retry</text>
+
+  <!-- answer -->
+  <rect x="680" y="180" width="160" height="80" rx="10" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="760" y="214" font-size="18" fill="#eef1ff" text-anchor="middle">answer</text>
+  <text x="760" y="240" font-size="15" fill="#9ba3c4" text-anchor="middle">LLM + citations</text>
+  <line x1="840" y1="220" x2="900" y2="220" stroke="#4ade80" stroke-width="2" marker-end="url(#arrow-green)"/>
+
+  <!-- END -->
+  <rect x="900" y="200" width="100" height="40" rx="20" fill="#11142a" stroke="#9ba3c4" stroke-width="1.5"/>
+  <text x="950" y="226" font-size="18" fill="#eef1ff" text-anchor="middle">END</text>
+
+  <!-- State panel -->
+  <rect x="60" y="320" width="220" height="186" rx="10" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="170" y="346" font-size="18" fill="#eef1ff" text-anchor="middle">QAState (shared)</text>
+  <text x="76" y="370" font-size="15" fill="#9ba3c4">question: str</text>
+  <text x="76" y="391" font-size="15" fill="#9ba3c4">query: str</text>
+  <text x="76" y="412" font-size="15" fill="#9ba3c4">docs: list[str]</text>
+  <text x="76" y="433" font-size="15" fill="#9ba3c4">good_enough: bool</text>
+  <text x="76" y="454" font-size="15" fill="#9ba3c4">missing: str</text>
+  <text x="76" y="475" font-size="15" fill="#9ba3c4">attempts: int</text>
+  <text x="76" y="496" font-size="15" fill="#9ba3c4">answer: str</text>
+
+  <!-- Notes -->
+  <text x="680" y="372" font-size="15" fill="#9ba3c4">Loop: grade -> rewrite -> retrieve -> grade</text>
+  <text x="680" y="394" font-size="15" fill="#9ba3c4">Stops when good_enough or attempts = 3</text>
+  <text x="680" y="416" font-size="15" fill="#9ba3c4">Every node reads the state and returns a partial update</text>
+
+  <!-- Legend -->
+  <text x="1140" y="490" font-size="15" fill="#9ba3c4" text-anchor="end">dashed = conditional edge (routing function)</text>
+</svg>

@@ -1,3 +1,4 @@
+import { t } from './i18n'
 // ponytail: parent-child chunking + TF-IDF. No vector DB, no embeddings dep.
 // Parents = markdown sections (split on headings, capped ~300 words).
 // Children = ~60-word windows scored at retrieve time; hits resolve to the
@@ -153,7 +154,7 @@ export function rerank(query: string, hits: ScoredChunk[], top = 3): ScoredChunk
 
 // Retrieval-only answer used when no API key is set.
 export function fallbackAnswer(query: string, top: ScoredChunk[]): string {
-  if (!top.length) return `I couldn't find anything about "${query}" in this portfolio or its blog posts. Try asking about the owner's background, skills, or a blog topic like RAG.`
+  if (!top.length) return t('chat.notFound', { q: query })
   const cites = [...new Set(top.map((c) => c.source))].map((s) => `[${s}]`).join(' ')
-  return `Based on this portfolio:\n\n${top.map((c) => `• ${c.text.slice(0, 450)}…`).join('\n')}\n\nSources: ${cites}\n\n(Set an OpenRouter API key for fluent answers — this is raw retrieval.)`
+  return `${t('chat.basedOn')}\n\n${top.map((c) => `• ${c.text.slice(0, 450)}…`).join('\n')}\n\n${t('chat.sources')} ${cites}\n\n${t('chat.raw')}`
 }

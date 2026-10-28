@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" width="1200" height="640" font-family="Inter, Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="m-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="640" rx="24" fill="#0b0d19"/>
+
+  <text x="40" y="44" font-size="22" font-weight="600" fill="#eef1ff">The start-simple ladder: climb one step only when a metric says so</text>
+
+  <!-- legend -->
+  <circle cx="905" cy="39" r="6" fill="#f0b429"/>
+  <text x="917" y="44" font-size="15" fill="#9ba3c4">trigger</text>
+  <circle cx="1000" cy="39" r="6" fill="#4ade80"/>
+  <text x="1012" y="44" font-size="15" fill="#9ba3c4">stop rule</text>
+
+  <!-- step boxes -->
+  <g stroke="#22d3ee" stroke-width="1.5" fill="#11142a">
+    <rect x="40" y="500" width="220" height="80" rx="12"/>
+    <rect x="265" y="400" width="220" height="80" rx="12"/>
+    <rect x="490" y="300" width="220" height="80" rx="12"/>
+    <rect x="715" y="200" width="220" height="80" rx="12"/>
+    <rect x="940" y="100" width="220" height="80" rx="12"/>
+  </g>
+
+  <g font-size="18" font-weight="600" fill="#eef1ff" text-anchor="middle">
+    <text x="150" y="530">1. Baseline</text>
+    <text x="375" y="430">2. Hybrid + RRF</text>
+    <text x="600" y="330">3. Rerank</text>
+    <text x="825" y="230">4. Better chunks</text>
+    <text x="1050" y="130">5. Query side</text>
+  </g>
+  <g font-size="15" fill="#9ba3c4" text-anchor="middle">
+    <text x="150" y="552">recursive chunks + top-5</text>
+    <text x="150" y="570">grounded prompt, eval set</text>
+    <text x="375" y="452">BM25 beside dense</text>
+    <text x="375" y="470">metadata filters</text>
+    <text x="600" y="352">cross-encoder, top-5</text>
+    <text x="600" y="370">retrieve 50, keep 5</text>
+    <text x="825" y="252">parent-child, headers</text>
+    <text x="825" y="270">contextual retrieval</text>
+    <text x="1050" y="152">rewrite, multi-query</text>
+    <text x="1050" y="170">HyDE, decomposition</text>
+  </g>
+
+  <!-- arrows between steps -->
+  <g fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#m-cyan)">
+    <polyline points="220,500 220,440 265,440"/>
+    <polyline points="445,400 445,340 490,340"/>
+    <polyline points="670,300 670,240 715,240"/>
+    <polyline points="895,200 895,140 940,140"/>
+  </g>
+
+  <!-- triggers (amber) -->
+  <g font-size="15" fill="#f0b429" text-anchor="end">
+    <text x="210" y="462">Recall@K low,</text>
+    <text x="210" y="482">IDs or codes missed</text>
+    <text x="435" y="362">recall fine, but</text>
+    <text x="435" y="382">precision@5 low</text>
+    <text x="660" y="262">chunk found, but</text>
+    <text x="660" y="282">context too thin</text>
+    <text x="885" y="162">vague or multi-hop</text>
+    <text x="885" y="182">questions fail</text>
+  </g>
+
+  <!-- stop rule panel -->
+  <rect x="740" y="330" width="420" height="200" rx="12" fill="#11142a" stroke="#4ade80" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="760" y="362" font-size="18" font-weight="600" fill="#eef1ff">Stop climbing when:</text>
+  <g font-size="15" fill="#9ba3c4">
+    <text x="760" y="394">- the metric that justified the step moved</text>
+    <text x="760" y="418">- p95 latency and cost per query fit the budget</text>
+    <text x="760" y="442">- the next step fixes a symptom you do not have</text>
+    <text x="760" y="466">- the test set is too small to show a change</text>
+  </g>
+  <text x="760" y="506" font-size="15" fill="#4ade80">Simplest system over the bar wins.</text>
+
+  <text x="600" y="616" font-size="15" fill="#9ba3c4" text-anchor="middle">Every step adds latency, money and moving parts. Baseline and measurement come first; the ladder is a response to evidence.</text>
+</svg>

@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" width="1200" height="700" font-family="Inter, Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arrow-pink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff3ddc"/>
+    </marker>
+    <marker id="arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4ade80"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="700" rx="24" fill="#0b0d19"/>
+
+  <!-- Left panel: closed book -->
+  <rect x="40" y="40" width="520" height="620" rx="16" fill="none" stroke="#ff3ddc" stroke-opacity="0.35" stroke-width="1.5" stroke-dasharray="6 6"/>
+  <text x="300" y="76" font-size="20" fill="#ff3ddc" font-weight="600" text-anchor="middle">LLM alone  (closed-book exam)</text>
+
+  <rect x="190" y="110" width="220" height="70" rx="12" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+  <text x="300" y="152" font-size="18" fill="#eef1ff" text-anchor="middle">Question</text>
+
+  <line x1="300" y1="180" x2="300" y2="300" stroke="#ff3ddc" stroke-width="2" marker-end="url(#arrow-pink)"/>
+
+  <rect x="150" y="300" width="300" height="90" rx="12" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+  <text x="300" y="336" font-size="18" fill="#eef1ff" text-anchor="middle">LLM</text>
+  <text x="300" y="366" font-size="15" fill="#9ba3c4" text-anchor="middle">only what its weights remember</text>
+
+  <line x1="300" y1="390" x2="300" y2="510" stroke="#ff3ddc" stroke-width="2" marker-end="url(#arrow-pink)"/>
+
+  <rect x="130" y="510" width="340" height="110" rx="12" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+  <text x="300" y="546" font-size="18" fill="#eef1ff" text-anchor="middle">Fluent answer</text>
+  <text x="300" y="574" font-size="15" fill="#9ba3c4" text-anchor="middle">may be outdated or invented</text>
+  <text x="300" y="598" font-size="15" fill="#9ba3c4" text-anchor="middle">no source to check</text>
+
+  <!-- Right panel: open book -->
+  <rect x="640" y="40" width="520" height="620" rx="16" fill="none" stroke="#22d3ee" stroke-opacity="0.35" stroke-width="1.5" stroke-dasharray="6 6"/>
+  <text x="900" y="76" font-size="20" fill="#22d3ee" font-weight="600" text-anchor="middle">LLM + retrieval  (open-book exam)</text>
+
+  <rect x="690" y="110" width="220" height="70" rx="12" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="800" y="152" font-size="18" fill="#eef1ff" text-anchor="middle">Question</text>
+
+  <line x1="800" y1="180" x2="800" y2="230" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrow-cyan)"/>
+
+  <rect x="690" y="230" width="220" height="70" rx="12" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="800" y="272" font-size="18" fill="#eef1ff" text-anchor="middle">Retriever</text>
+
+  <rect x="960" y="230" width="180" height="70" rx="12" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="1050" y="259" font-size="18" fill="#eef1ff" text-anchor="middle">Your docs</text>
+  <text x="1050" y="284" font-size="15" fill="#9ba3c4" text-anchor="middle">indexed earlier</text>
+
+  <line x1="960" y1="265" x2="910" y2="265" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrow-cyan)"/>
+
+  <line x1="800" y1="300" x2="800" y2="350" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrow-cyan)"/>
+
+  <rect x="660" y="350" width="280" height="90" rx="12" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="800" y="386" font-size="18" fill="#eef1ff" text-anchor="middle">Prompt</text>
+  <text x="800" y="416" font-size="15" fill="#9ba3c4" text-anchor="middle">question + 3-5 relevant passages</text>
+
+  <line x1="800" y1="440" x2="800" y2="490" stroke="#4ade80" stroke-width="2" marker-end="url(#arrow-green)"/>
+
+  <rect x="690" y="490" width="220" height="70" rx="12" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="800" y="519" font-size="18" fill="#eef1ff" text-anchor="middle">LLM</text>
+  <text x="800" y="544" font-size="15" fill="#9ba3c4" text-anchor="middle">reads the passages</text>
+
+  <line x1="800" y1="560" x2="800" y2="590" stroke="#4ade80" stroke-width="2" marker-end="url(#arrow-green)"/>
+
+  <rect x="660" y="590" width="280" height="56" rx="12" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="800" y="625" font-size="18" fill="#eef1ff" text-anchor="middle">Grounded answer + citations</text>
+</svg>

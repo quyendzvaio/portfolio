@@ -1,3 +1,4 @@
+import type { Lang } from './i18n'
 // The one place that knows the backend contract. Everything else in src/ talks to
 // this instead of calling fetch directly, so the API shape lives in exactly one file.
 
@@ -150,8 +151,8 @@ export const uploadAvatar = (file: Blob) =>
 
 export const getChatStatus = () => request<{ llmEnabled: boolean }>('/api/chat/status')
 
-export const askChat = (query: string, context: { source: string; text: string }[]) =>
+export const askChat = (query: string, context: { source: string; text: string }[], lang: Lang) =>
   request<{ answer: string }>('/api/chat', {
     method: 'POST',
-    body: JSON.stringify({ query, context }),
+    body: JSON.stringify({ query, context, lang }),
   })

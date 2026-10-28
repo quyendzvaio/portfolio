@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" width="1200" height="700" font-family="Inter, Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4ade80"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f0b429"/>
+    </marker>
+    <marker id="arrow-pink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff3ddc"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="700" rx="24" fill="#0b0d19"/>
+
+  <text x="600" y="48" text-anchor="middle" fill="#eef1ff" font-size="22" font-weight="600">MCP architecture: host, clients, servers, transports</text>
+
+  <!-- HOST -->
+  <rect x="40" y="90" width="440" height="520" rx="16" fill="#0e1124" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="60" y="124" fill="#eef1ff" font-size="20" font-weight="600">MCP Host</text>
+  <text x="60" y="148" fill="#9ba3c4" font-size="15">the AI application: support agent, IDE, chat app</text>
+
+  <!-- LLM and agent loop -->
+  <rect x="70" y="180" width="160" height="70" rx="10" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+  <text x="150" y="210" text-anchor="middle" fill="#eef1ff" font-size="18">LLM</text>
+  <text x="150" y="232" text-anchor="middle" fill="#9ba3c4" font-size="15">chooses a tool</text>
+
+  <rect x="270" y="180" width="190" height="70" rx="10" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="365" y="210" text-anchor="middle" fill="#eef1ff" font-size="18">Agent loop + UI</text>
+  <text x="365" y="232" text-anchor="middle" fill="#9ba3c4" font-size="15">consent, context, routing</text>
+
+  <line x1="230" y1="215" x2="270" y2="215" stroke="#ff3ddc" stroke-width="1.5" marker-start="url(#arrow-pink)" marker-end="url(#arrow-pink)"/>
+
+  <!-- Clients -->
+  <g fill="#11142a" stroke="#22d3ee" stroke-width="1.5">
+    <rect x="70" y="300" width="390" height="60" rx="10"/>
+    <rect x="70" y="400" width="390" height="60" rx="10"/>
+    <rect x="70" y="500" width="390" height="60" rx="10"/>
+  </g>
+  <g fill="#eef1ff" font-size="18">
+    <text x="90" y="336">MCP Client 1</text>
+    <text x="90" y="436">MCP Client 2</text>
+    <text x="90" y="536">MCP Client 3</text>
+  </g>
+  <g fill="#9ba3c4" font-size="15" text-anchor="end">
+    <text x="440" y="336">1 client : 1 server</text>
+    <text x="440" y="436">1 client : 1 server</text>
+    <text x="440" y="536">1 client : 1 server</text>
+  </g>
+
+  <!-- agent loop -> clients -->
+  <line x1="365" y1="250" x2="365" y2="300" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+  <text x="60" y="590" fill="#9ba3c4" font-size="15">The host creates one client per server it connects to.</text>
+
+  <!-- Local machine group -->
+  <rect x="700" y="255" width="480" height="215" rx="14" fill="none" stroke="#2a2f4a" stroke-width="1.5" stroke-dasharray="6 6"/>
+  <text x="716" y="280" fill="#9ba3c4" font-size="15">Local machine (same box as the host)</text>
+
+  <!-- Remote group -->
+  <rect x="700" y="480" width="480" height="110" rx="14" fill="none" stroke="#2a2f4a" stroke-width="1.5" stroke-dasharray="6 6"/>
+  <text x="716" y="505" fill="#9ba3c4" font-size="15">Internet (remote server)</text>
+
+  <!-- Servers -->
+  <g fill="#11142a" stroke="#a78bfa" stroke-width="1.5">
+    <rect x="720" y="295" width="220" height="70" rx="10"/>
+    <rect x="720" y="385" width="220" height="70" rx="10"/>
+    <rect x="720" y="515" width="220" height="70" rx="10"/>
+  </g>
+  <g fill="#eef1ff" font-size="18" text-anchor="middle">
+    <text x="830" y="323">MCP Server A</text>
+    <text x="830" y="413">MCP Server B</text>
+    <text x="830" y="543">MCP Server C</text>
+  </g>
+  <g fill="#9ba3c4" font-size="15" text-anchor="middle">
+    <text x="830" y="347">orders (Python, local)</text>
+    <text x="830" y="437">files (local)</text>
+    <text x="830" y="567">CRM (hosted by vendor)</text>
+  </g>
+
+  <!-- Real systems -->
+  <g fill="#11142a" stroke="#f0b429" stroke-width="1.5">
+    <rect x="1000" y="295" width="160" height="70" rx="10"/>
+    <rect x="1000" y="385" width="160" height="70" rx="10"/>
+    <rect x="1000" y="515" width="160" height="70" rx="10"/>
+  </g>
+  <g fill="#eef1ff" font-size="18" text-anchor="middle">
+    <text x="1080" y="323">Orders DB</text>
+    <text x="1080" y="413">Local disk</text>
+    <text x="1080" y="543">CRM SaaS</text>
+  </g>
+  <g fill="#9ba3c4" font-size="15" text-anchor="middle">
+    <text x="1080" y="347">REST + API key</text>
+    <text x="1080" y="437">file system</text>
+    <text x="1080" y="567">vendor REST API</text>
+  </g>
+
+  <!-- Transports: client -> server -->
+  <g stroke="#4ade80" stroke-width="1.5">
+    <line x1="460" y1="330" x2="720" y2="330" marker-start="url(#arrow-green)" marker-end="url(#arrow-green)"/>
+    <line x1="460" y1="430" x2="720" y2="420" marker-start="url(#arrow-green)" marker-end="url(#arrow-green)"/>
+    <line x1="460" y1="530" x2="720" y2="550" marker-start="url(#arrow-green)" marker-end="url(#arrow-green)"/>
+  </g>
+  <g fill="#4ade80" font-size="15" text-anchor="middle">
+    <text x="590" y="320">stdio (subprocess)</text>
+    <text x="590" y="414">stdio (subprocess)</text>
+    <text x="590" y="528">Streamable HTTP + OAuth 2.1</text>
+  </g>
+  <text x="590" y="270" text-anchor="middle" fill="#9ba3c4" font-size="15">JSON-RPC 2.0 messages over:</text>
+
+  <!-- Servers -> real systems -->
+  <g stroke="#f0b429" stroke-width="1.5" marker-end="url(#arrow-amber)">
+    <line x1="940" y1="330" x2="1000" y2="330"/>
+    <line x1="940" y1="420" x2="1000" y2="420"/>
+    <line x1="940" y1="550" x2="1000" y2="550"/>
+  </g>
+
+  <!-- Legend -->
+  <g font-size="15" fill="#9ba3c4">
+    <rect x="60" y="648" width="14" height="14" rx="3" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+    <text x="82" y="660">Host side (app + clients)</text>
+    <rect x="290" y="648" width="14" height="14" rx="3" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+    <text x="312" y="660">Language model</text>
+    <rect x="470" y="648" width="14" height="14" rx="3" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
+    <text x="492" y="660">Transport (how bytes move)</text>
+    <rect x="720" y="648" width="14" height="14" rx="3" fill="#11142a" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="742" y="660">MCP server</text>
+    <rect x="880" y="648" width="14" height="14" rx="3" fill="#11142a" stroke="#f0b429" stroke-width="1.5"/>
+    <text x="902" y="660">Real system behind it</text>
+  </g>
+</svg>
