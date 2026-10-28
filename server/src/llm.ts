@@ -7,6 +7,9 @@ export interface ContextChunk {
 
 export type Lang = 'en' | 'vi'
 const LANGUAGE: Record<Lang, string> = { en: 'English', vi: 'Vietnamese' }
+// Said in the target language and repeated around the question: the free model on
+// OpenRouter ignored an English "answer in Vietnamese" in the system prompt alone.
+const REPLY_IN: Record<Lang, string> = { en: 'Answer in English.', vi: 'Hãy trả lời hoàn toàn bằng tiếng Việt.' }
 
 function systemPrompt(lang: Lang): string {
   return [
@@ -44,7 +47,7 @@ export async function ask(query: string, context: ContextChunk[], lang: Lang = '
         { role: 'system', content: systemPrompt(lang) },
         {
           role: 'user',
-          content: `Context:\n${contextText || '(no relevant chunks found)'}\n\nQuestion: ${query}`,
+          content: `${REPLY_IN[lang]}\n\nContext:\n${contextText || '(no relevant chunks found)'}\n\nQuestion: ${query}\n\n${REPLY_IN[lang]}`,
         },
       ],
     }),
