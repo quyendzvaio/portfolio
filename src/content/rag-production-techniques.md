@@ -112,20 +112,10 @@ and only cut mid-sentence when nothing else fits. Technically it splits on an or
 of separators, trying paragraphs first (`\n\n`),
 and only if a piece is still too long dropping to lines (`\n`), then spaces, then
 characters. The idea: larger units (paragraphs) tend to belong together semantically, so
-keep them whole as long as possible. This is the sensible default for general text. With
-LangChain 1.x the splitters live in the `langchain-text-splitters` package (1.1.x):
-
-```python
-# pip install langchain-text-splitters
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-splitter = RecursiveCharacterTextSplitter(
-    chunk_size=800,      # measured in characters (default length_function is len)
-    chunk_overlap=120,   # ~15%, so an idea cut in half survives intact on one side
-    separators=["\n\n", "\n", " ", ""],  # tried in this order; also the default
-)
-chunks = splitter.split_text(document_text)
-```
+keep them whole as long as possible. This is the sensible default for general text; in LangChain 1.x it is
+`RecursiveCharacterTextSplitter` in the `langchain-text-splitters` package, with two
+parameters worth attention: chunk size (about 800 characters is a good start) and overlap
+(10–15%, so an idea cut in half survives intact on one side).
 
 **Semantic chunking**: cut where the document changes subject, the way you would draw a
 line when reading and thinking "ah, this is a new point". The machine does it by embedding
@@ -216,17 +206,9 @@ the wrong details (the paper calls it the "dense bottleneck"). The
 [HyDE paper](https://arxiv.org/abs/2212.10496) (Gao et al., 2022) showed it beating the
 strongest unsupervised retriever of its time with no training data.
 
-```python
-def hyde_search(question: str, llm, embed, index, k: int = 20):
-    """llm(prompt) -> str, embed(text) -> vector, index.search(vec, k) -> hits."""
-    fake = llm(
-        "Write one short paragraph that answers the question as if it were "
-        f"taken from an internal document. Question: {question}"
-    )
-    # Embed the hypothetical answer, NOT the question; wrong details get smoothed
-    # out because similar documents sit in the same region of the vector space.
-    return index.search(embed(fake), k)
-```
+In the system, HyDE is one small extra step on the query side: a prompt asks the model
+to write a paragraph as if taken from an internal document, and that paragraph is
+embedded instead of the question.
 
 The price: one LLM call per question, and a reverse risk: if the question is in a domain
 the model does not know, the fake paragraph drags the search in the wrong direction. Use
@@ -295,17 +277,8 @@ vanish as they would with an exponential, and the constant k mitigates the impac
 rankings by outlier systems; k = 60 was fixed in a pilot study and found near-optimal but
 not critical.
 
-```python
-def rrf(ranked_lists: list[list[str]], k: int = 60) -> list[tuple[str, float]]:
-    """ranked_lists: each inner list holds chunk ids, best first."""
-    scores: dict[str, float] = {}
-    for ranking in ranked_lists:
-        for rank, chunk_id in enumerate(ranking, start=1):
-            scores[chunk_id] = scores.get(chunk_id, 0.0) + 1.0 / (k + rank)
-    return sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
-
-fused = rrf([bm25_ids, dense_ids])[:80]   # feed the top 80 to the reranker
-```
+In the system, fusion is one small function over two lists of chunk ids; its top ~80
+go on to the reranker.
 
 *Weighted score fusion* keeps the scores but converts both to the same scale before
 adding, and lets you choose which side to trust more. Concretely it normalizes each list
@@ -347,20 +320,9 @@ hybrid search, rerank, keep a small top-K (3–10) for the model. Anthropic's Co
 Retrieval post used 150 candidates and kept 20; for internal chatbots I usually find
 50 → 5 enough.
 
-```python
-# pip install sentence-transformers  (model from the Sentence Transformers docs)
-from sentence_transformers import CrossEncoder
-import torch
-
-reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L6-v2",
-                        activation_fn=torch.nn.Sigmoid())  # scores in [0, 1]
-
-pairs = [(question, chunk.text) for chunk in candidates]   # ~80 pairs
-scores = reranker.predict(pairs)
-top = sorted(zip(candidates, scores), key=lambda t: t[1], reverse=True)[:5]
-```
-
-The Sentence Transformers model table lists `ms-marco-MiniLM-L6-v2` at NDCG@10 74.30 on
+If you self-host, `cross-encoder/ms-marco-MiniLM-L6-v2` from Sentence Transformers is the
+common starting point: it takes each (question, chunk) pair and returns a score between 0
+and 1. Their model table lists it at NDCG@10 74.30 on
 TREC DL 19 at about 1,800 documents per second; the L2 variant is twice as fast and 3
 points lower. If you do not want to host a model, [Cohere Rerank](https://docs.cohere.com/docs/rerank-overview)
 (currently `rerank-v5.0-pro` and `rerank-v5.0-fast`, multilingual) is an API with a
@@ -621,39 +583,13 @@ passages are mixed in, does the model get dragged into saying wrong things? The 
 claims in the answer when the system had relevant context (`mode="relevant"`) or noisy
 context (`mode="irrelevant"`). It measures whether junk context drags the model along.
 
-RAGAS is at 0.4.x and moving to a new `ragas.metrics.collections` API (the old
-`SingleTurnSample` API is marked deprecated from 0.4, slated for removal in 1.0). Scoring
-one sample with the new API, following the docs' examples:
-
-```python
-# pip install ragas openai        (ragas 0.4.x, collections API)
-from openai import AsyncOpenAI
-from ragas.llms import llm_factory
-from ragas.embeddings.base import embedding_factory
-from ragas.metrics.collections import (
-    Faithfulness, AnswerRelevancy, ContextPrecision, ContextRecall,
-)
-
-client = AsyncOpenAI()
-judge = llm_factory("gpt-4o-mini", client=client)       # the judge model
-emb = embedding_factory("openai", model="text-embedding-3-small", client=client)
-
-faith = Faithfulness(llm=judge)                       # reference-free
-relev = AnswerRelevancy(llm=judge, embeddings=emb)    # reference-free
-prec = ContextPrecision(llm=judge)                    # needs reference
-rec = ContextRecall(llm=judge)                        # needs reference
-
-async def score_one(row: dict) -> dict:
-    """row: user_input, response, retrieved_contexts (list[str]), reference."""
-    q, a, ctx, ref = (row["user_input"], row["response"],
-                      row["retrieved_contexts"], row["reference"])
-    f = await faith.ascore(user_input=q, response=a, retrieved_contexts=ctx)
-    r = await relev.ascore(user_input=q, response=a)
-    p = await prec.ascore(user_input=q, reference=ref, retrieved_contexts=ctx)
-    c = await rec.ascore(user_input=q, reference=ref, retrieved_contexts=ctx)
-    return {"faithfulness": f.value, "relevancy": r.value,
-            "ctx_precision": p.value, "ctx_recall": c.value}
-```
+RAGAS is at 0.4.x and moving to a new API (`ragas.metrics.collections`; the old
+`SingleTurnSample` API is marked deprecated from 0.4, slated for removal in 1.0). At the
+system level the usage is compact: pick a model as the judge (plus an embedding model for
+response relevancy), create each metric once, then for every sample in the golden set pass
+in four things: the question, the answer, the list of retrieved contexts, and the reference
+answer. Each metric returns a number in [0, 1]; reference-free metrics need only the first
+three.
 
 Three cautions for every LLM-based metric: (1) the judge is noisy, two runs give slightly
 different numbers, so compare on 50+ samples and look at trends, not at one number; (2)
@@ -686,28 +622,11 @@ guess. Three common tools:
 self-hostable, with evaluation, datasets and prompt management),
 [LangSmith](https://docs.langchain.com/langsmith) (by LangChain, but it traces
 non-LangChain code too), and [Arize Phoenix](https://arize.com/docs/phoenix) (open
-source, built on OpenTelemetry/OpenInference). With the Langfuse Python SDK v5:
-
-```python
-# pip install langfuse   (SDK v5; reads LANGFUSE_PUBLIC_KEY / SECRET_KEY / BASE_URL)
-from langfuse import get_client
-
-langfuse = get_client()
-
-def answer(question: str) -> str:
-    with langfuse.start_as_current_observation(as_type="span", name="rag") as root:
-        with langfuse.start_as_current_observation(as_type="span", name="retrieve") as s:
-            chunks = retrieve(question)                      # hybrid + rerank
-            s.update(output=[c.id for c in chunks])          # keep ids, not full text
-        with langfuse.start_as_current_observation(
-            as_type="generation", name="llm", model="gpt-4o-mini"
-        ) as g:
-            text = generate(question, chunks)
-            g.update(output=text)
-        root.update(output=text)
-    langfuse.flush()        # short-lived processes must flush before exit
-    return text
-```
+source, built on OpenTelemetry/OpenInference). With Langfuse (Python SDK v5) you wrap
+each pipeline step in a *span* (a named time interval: retrieve, rerank, generate), wrap
+the LLM call in a *generation* that records the model name, and the spans nest into one
+trace per request. The SDK sends data asynchronously in batches, so it does not slow the
+app; record chunk ids rather than full text to keep traces light.
 
 Every trace should also record: prompt version, index version, embedding model name,
 cache hit or not, fallback or not. These are the axes you will slice dashboards by.

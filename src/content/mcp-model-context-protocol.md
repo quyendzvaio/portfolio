@@ -2,7 +2,7 @@
 title: "MCP: one protocol between agents and their tools"
 date: "2026-10-27"
 tags: ["mcp", "agents", "tools"]
-summary: "Why LLMs struggle with ordinary APIs, how MCP fixes that, every component as defined by the 2026-07-28 spec, and an order-lookup MCP server written with the Python SDK."
+summary: "Why LLMs struggle with ordinary APIs, how MCP fixes that through its components and one tool call, then the detailed structure of host, client and server per the 2026-07-28 spec."
 ---
 
 # MCP: one protocol between agents and their tools
@@ -12,14 +12,12 @@ picks its own next step, branches, and pauses for a human. But that agent is onl
 the tools in its hands: order lookup, refunds, CRM ticketing, email. And every tool is a
 different API that someone wires up by hand, separately for every application. Post 4 just
 said the tools "sit behind MCP servers" and moved on. This post opens that box: what MCP is,
-why it fixes exactly that weakness, what is inside, and what a real server looks like in
-Python.
+why it fixes exactly that weakness, and what is inside each component.
 
 Every protocol detail here is checked against the current spec at
 [modelcontextprotocol.io](https://modelcontextprotocol.io/specification/latest), revision
-**2026-07-28**, and against the MCP Python SDK 2.x docs (`mcp` 2.3.0, October 2026). This
-revision changed a lot compared with the 2025 ones, so wherever it differs from what you will
-find in older blog posts, I say so.
+**2026-07-28**. This revision changed a lot compared with the 2025 ones, so wherever it
+differs from what you will find in older blog posts, I say so.
 
 ## 1. What makes ordinary APIs hard for an LLM
 
@@ -143,7 +141,13 @@ diagram below is every message, with MCP in the middle.
 
 The most important point: *the LLM never touched the Orders API*. It saw a small schema and a
 text result. Auth, URLs, retries and formatting all live in the server, written once, shared by
-every host.
+every host. If the order does not exist, step 7 fails and the server returns a result with
+`isError` true and a hint; the model reads it and asks the customer to re-check the number.
+
+Step 5 is the part MCP does *not* do for you. In the [post 4](#/blog/langgraph-ai-agents)
+graph, the node that calls the refund tool passes through a "wait for human approval" node (a
+LangGraph interrupt) before `tools/call` is sent; the tool's `destructiveHint` (section 3.4)
+is the signal that tells the host which tools need that node.
 
 ### 2.3 When the tool list changes
 
@@ -229,134 +233,43 @@ when a reply is expected. MCP uses its three message types as they are.
 Every request must carry two required fields in `_meta`:
 `io.modelcontextprotocol/protocolVersion` and `io.modelcontextprotocol/clientCapabilities`,
 and should carry `io.modelcontextprotocol/clientInfo`. A request missing a required field gets
-error `-32602`. Here is a real `server/discover` request:
+error `-32602`.
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "server/discover",
-  "params": {
-    "_meta": {
-      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-      "io.modelcontextprotocol/clientInfo": {
-        "name": "support-agent", "version": "0.3.0"
-      },
-      "io.modelcontextprotocol/clientCapabilities": { "elicitation": { "form": {} } }
-    }
-  }
-}
-```
+Instead of printing JSON, the table below lists the messages you will meet most often and the
+fields each one carries. Every request also carries the `_meta` block described above.
 
-And the Orders server's reply:
+| Message | Direction | Main fields |
+|---|---|---|
+| `server/discover` request | client sends | only `_meta` |
+| `server/discover` result | server returns | `supportedVersions`, `capabilities`, `instructions`, `ttlMs`, `cacheScope`; `serverInfo` inside `_meta` |
+| `tools/list` request | client sends | `cursor` (optional, pagination) |
+| `tools/list` result | server returns | `tools[]`, `nextCursor`, `ttlMs`, `cacheScope` |
+| `tools/call` request | client sends | `name`, `arguments` |
+| `tools/call` result | server returns | `content[]`, `structuredContent`, `isError` |
+| `subscriptions/listen` request | client sends | `notifications`: `toolsListChanged`, `promptsListChanged`, `resourcesListChanged`, `resourceSubscriptions[]` |
+| `notifications/tools/list_changed` | server pushes | `_meta` with the `subscriptionId` of the open stream |
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "resultType": "complete",
-    "supportedVersions": ["2026-07-28", "2025-11-25"],
-    "capabilities": { "tools": { "listChanged": true }, "resources": {} },
-    "_meta": {
-      "io.modelcontextprotocol/serverInfo": { "name": "orders", "version": "1.0.0" }
-    },
-    "instructions": "Order numbers are digits only. Never guess an order id.",
-    "ttlMs": 3600000,
-    "cacheScope": "public"
-  }
-}
-```
+A few fields in the `server/discover` result deserve a note. `supportedVersions` lists the
+protocol versions the server understands, for example `2026-07-28` and `2025-11-25`.
+`capabilities` says whether the server has tools, resources and prompts, and whether it can
+report `listChanged`. `instructions` is where the server tells the model how to use it
+("order numbers are digits only, never guess one"); hosts usually append it to the system
+prompt. `ttlMs` and `cacheScope` are cache hints, required on every `*/list` result and on
+`resources/read`.
 
-`instructions` is where the server tells the model how to use it; hosts usually append it to
-the system prompt. `ttlMs` and `cacheScope` are cache hints, required on every `*/list` result
-and on `resources/read`.
+For the Orders server in the example, `tools/list` returns exactly one tool. Its `name` is
+`lookup_order`, its `title` "Look up an order", and its `description` says it returns the
+status, delivery estimate and total of one order. The `inputSchema` has one required string
+field, `order_id`, described as "order number without the # sign". The `outputSchema` has four
+fields: `order_id`, `status` (one of processing, shipped, delivered, cancelled), `eta` (an ISO
+8601 date) and `total_vnd` (an integer). The `annotations` declare `readOnlyHint` true and
+`openWorldHint` false: a read-only tool in a closed world.
 
-`tools/list` (I omit `_meta` from here on for brevity; on the wire it is still required):
-
-```json
-{ "jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {} }
-```
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 2,
-  "result": {
-    "resultType": "complete",
-    "tools": [
-      {
-        "name": "lookup_order",
-        "title": "Look up an order",
-        "description": "Return the status, delivery estimate and total of one order.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "order_id": {
-              "type": "string",
-              "description": "Order number without the # sign."
-            }
-          },
-          "required": ["order_id"]
-        },
-        "outputSchema": {
-          "type": "object",
-          "properties": {
-            "order_id": { "type": "string" },
-            "status": {
-              "type": "string",
-              "enum": ["processing", "shipped", "delivered", "cancelled"]
-            },
-            "eta": {
-              "type": "string",
-              "description": "Expected delivery date, ISO 8601."
-            },
-            "total_vnd": { "type": "integer" }
-          },
-          "required": ["order_id", "status", "eta", "total_vnd"]
-        },
-        "annotations": { "readOnlyHint": true, "openWorldHint": false }
-      }
-    ],
-    "ttlMs": 300000,
-    "cacheScope": "public"
-  }
-}
-```
-
-`tools/call` and its result:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 3,
-  "method": "tools/call",
-  "params": { "name": "lookup_order", "arguments": { "order_id": "4821" } }
-}
-```
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 3,
-  "result": {
-    "resultType": "complete",
-    "content": [
-      {
-        "type": "text",
-        "text": "Order 4821: shipped, ETA 2026-10-30, total 1,250,000 VND"
-      }
-    ],
-    "structuredContent": {
-      "order_id": "4821", "status": "shipped", "eta": "2026-10-30", "total_vnd": 1250000
-    },
-    "isError": false
-  }
-}
-```
-
-The `text` block above is a readable summary; the spec recommends putting the serialised
-JSON of `structuredContent` there so clients that ignore `outputSchema` still work.
+A `tools/call` with `arguments` of `order_id` "4821" returns `content` holding one text block
+with a summary ("order 4821 shipped, ETA 30 Oct, total 1,250,000 VND"), a `structuredContent`
+object with the four fields matching the `outputSchema`, and `isError` false. The spec
+recommends that the text block be the serialised JSON of `structuredContent`, so clients that
+ignore `outputSchema` still work.
 
 Two kinds of error need telling apart. **Protocol errors** (unknown tool, malformed request)
 come back as a JSON-RPC `error`, for example `-32602 Unknown tool`; the model is unlikely to
@@ -364,26 +277,12 @@ recover from those. **Tool execution errors** (the API failed, a date was in the
 the order does not exist) come back inside `result` with `isError: true` and a text explanation;
 the spec says clients should pass these to the model so it can correct itself and retry.
 
-So that you recognise it when you meet it, this is the handshake of revision 2025-11-25 and
-earlier:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "initialize",
-  "params": {
-    "protocolVersion": "2025-11-25",
-    "capabilities": { "elicitation": { "form": {} } },
-    "clientInfo": { "name": "support-agent", "version": "0.3.0" }
-  }
-}
-```
-
-The server replied with `protocolVersion`, `capabilities`, `serverInfo` and `instructions`; the
-client sent `notifications/initialized`; only then could it call `tools/list`. In the current
-revision those three messages collapse into an optional `server/discover` plus the `_meta`
-block on every request.
+So that you recognise it when you meet it, the handshake of revision 2025-11-25 and earlier was
+three messages: the client sent an `initialize` request carrying `protocolVersion`,
+`capabilities` and `clientInfo`; the server replied with `protocolVersion`, `capabilities`,
+`serverInfo` and `instructions`; the client sent a `notifications/initialized` notification;
+only then could it call `tools/list`. In the current revision those three messages collapse
+into an optional `server/discover` plus the `_meta` block on every request.
 
 ### 3.4 Server primitives
 
@@ -448,30 +347,11 @@ requests): the server returns an interim result with `resultType: "input_require
 holds `inputRequests`, the client collects the answers, then **re-sends the original request**
 with `inputResponses` and a fresh `id`.
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 7,
-  "result": {
-    "resultType": "input_required",
-    "inputRequests": {
-      "confirm": {
-        "method": "elicitation/create",
-        "params": {
-          "mode": "form",
-          "message": "Refund 1,250,000 VND for order #4821?",
-          "requestedSchema": {
-            "type": "object",
-            "properties": { "confirm": { "type": "boolean" } },
-            "required": ["confirm"]
-          }
-        }
-      }
-    },
-    "requestState": "opaque-signed-blob"
-  }
-}
-```
+For the refund tool, that interim result looks like this: `resultType` is `input_required`;
+`inputRequests` holds one entry, named by the server, say `confirm`, whose `method` is
+`elicitation/create` and whose `params` carry `mode` form, a `message` for the user ("Refund
+1,250,000 VND for order #4821?") and a `requestedSchema` describing a single boolean field
+called `confirm`; and finally a `requestState`.
 
 `requestState` is an opaque string only the server understands; the client must echo it back
 unchanged and must not inspect it. Because it passes through the client, the spec treats it as
@@ -568,201 +448,7 @@ the exact command it is about to run and get confirmation before a "one-click" s
 > Remember: the protocol cannot enforce any of this; it only gives you the places to plug it
 > in. The host is where you have to implement it.
 
-## 4. Writing an MCP server with the Python SDK
-
-Now turn section 3 into code: a server exposing a `lookup_order` tool, a refund-policy resource,
-an order-history resource template and a triage prompt.
-
-### 4.1 Install
-
-```bash
-uv add "mcp[cli]"        # or: pip install "mcp[cli]"
-```
-
-SDK 2.x renamed the `FastMCP` class to `MCPServer` and **removed** the old
-`mcp.server.fastmcp` import path (not deprecated, removed). If you see
-`from mcp.server.fastmcp import FastMCP`, that is SDK 1.x; change it to
-`from mcp.server import MCPServer`. The `fastmcp` package on PyPI is a separate project, not
-the official SDK.
-
-### 4.2 The server
-
-```python
-# orders_server.py  -  MCP Python SDK 2.x (mcp 2.3.0)
-from typing import Annotated, Literal
-
-from pydantic import BaseModel, Field
-
-from mcp.server import MCPServer
-from mcp.types import ToolAnnotations
-
-mcp = MCPServer("orders")
-
-# Stands in for the real Orders API: in production this is a function that
-# calls REST with an API key from the server process's environment, never
-# from the model.
-ORDERS = {
-    "4821": {"status": "shipped", "eta": "2026-10-30", "total_vnd": 1_250_000},
-    "4822": {"status": "processing", "eta": "2026-11-03", "total_vnd": 390_000},
-}
-
-
-class Order(BaseModel):
-    """Return type: the SDK turns it into outputSchema and structuredContent."""
-
-    order_id: str
-    status: Literal["processing", "shipped", "delivered", "cancelled"]
-    eta: str = Field(description="Expected delivery date, ISO 8601.")
-    total_vnd: int
-
-
-@mcp.tool(
-    title="Look up an order",
-    annotations=ToolAnnotations(read_only_hint=True, open_world_hint=False),
-)
-def lookup_order(
-    order_id: Annotated[str, Field(description="Order number without the # sign.")],
-) -> Order:
-    """Return the status, delivery estimate and total of one order."""
-    row = ORDERS.get(order_id)
-    if row is None:
-        # Raising -> the client gets a result with isError: true and a message
-        # the model can read, so it can ask the customer to re-check the number.
-        raise ValueError(f"No order {order_id!r}. Ask the customer to re-check it.")
-    return Order(order_id=order_id, **row)
-
-
-@mcp.resource("policy://refunds", mime_type="text/markdown")
-def refund_policy() -> str:
-    """Refund policy the agent must follow before proposing a refund."""
-    return (
-        "# Refund policy\n\n"
-        "- Full refund within 14 days of delivery.\n"
-        "- Shipped orders: refund only after the parcel is returned.\n"
-        "- Above 5,000,000 VND a human must approve.\n"
-    )
-
-
-@mcp.resource("orders://{order_id}/history", mime_type="application/json")
-def order_history(order_id: str) -> dict[str, list[str]]:
-    """Status history of one order, newest last."""
-    return {"events": ["2026-10-25 created", "2026-10-27 shipped"]}
-
-
-@mcp.prompt(title="Triage a support ticket")
-def triage(ticket: Annotated[str, Field(description="Raw ticket text.")]) -> str:
-    """Classify a ticket and propose the next tool to call."""
-    return (
-        "Classify this ticket as order_status, refund, or other. "
-        "If it mentions an order number, call lookup_order first.\n\n" + ticket
-    )
-
-
-if __name__ == "__main__":
-    mcp.run()  # default transport: stdio
-```
-
-What the SDK does for you, mapped back to section 3.4:
-
-- The function name becomes `name`, the docstring `description`, the type hints `inputSchema`. `Annotated[..., Field(description=...)]` puts a description on each property; this is where you write "for the model", not for a human.
-- The return type is the `outputSchema`. Return a `BaseModel`, `TypedDict` or `dataclass` and the schema is that type; return an `int` or `str` and the SDK wraps it as `{"result": ...}`. Switch it off with `@mcp.tool(structured_output=False)`.
-- Bad arguments (missing `order_id`, wrong type) are rejected before your function runs.
-- A plain `def` runs in a thread so it does not block the server; use `async def` for I/O.
-- A resource whose URI has placeholders becomes a resource template; placeholder names must match parameter names or the SDK fails at import time.
-- `mime_type` defaults to `text/plain`; the SDK never guesses, you declare it.
-- On stdio, `stdout` is the protocol wire: log with the `logging` module (which writes to `stderr`), never `print`.
-
-Try it in the Inspector (needs `npx`):
-
-```bash
-uv run mcp dev orders_server.py
-```
-
-To serve many clients over HTTP, change the run call, not the tool code:
-
-```python
-mcp.run(transport="streamable-http", host="127.0.0.1", port=8000)
-# endpoint: http://127.0.0.1:8000/mcp
-```
-
-SDK 2.x serves both 2026-07-28 clients and 2025-era clients (the `initialize` handshake) on
-the same endpoint, routing on the `MCP-Protocol-Version` header, with nothing to configure. If
-your tools never call back into the client, set `stateless_http=True` so any worker can take
-any request.
-
-### 4.3 A client calling the server
-
-The `Client` class in SDK 2.x folds transport, session and version negotiation into one
-context manager. It takes a URL (Streamable HTTP), a `StdioServerParameters` (subprocess), or
-the `MCPServer` object itself for in-memory tests.
-
-```python
-# client_demo.py
-import anyio
-
-from mcp import Client, StdioServerParameters
-from mcp.types import TextResourceContents
-
-server = StdioServerParameters(command="uv", args=["run", "orders_server.py"])
-
-
-async def main() -> None:
-    async with Client(server) as client:          # discover + version selection
-        print(client.server_capabilities)          # tools, resources, prompts...
-
-        tools = await client.list_tools()          # tools/list
-        print([t.name for t in tools.tools])       # ['lookup_order']
-
-        result = await client.call_tool("lookup_order", {"order_id": "4821"})
-        print(result.is_error)                     # False
-        print(result.structured_content)           # {'order_id': '4821', 'status': ...}
-
-        bad = await client.call_tool("lookup_order", {"order_id": "9999"})
-        print(bad.is_error)                        # True: the model can self-correct
-
-        policy = await client.read_resource("policy://refunds")   # resources/read
-        for block in policy.contents:
-            if isinstance(block, TextResourceContents):
-                print(block.text[:40])
-
-
-anyio.run(main)
-```
-
-Switching to the HTTP server is a change of argument:
-`async with Client("http://127.0.0.1:8000/mcp")`. For headers or OAuth, build your own
-`httpx2.AsyncClient` and pass it to `streamable_http_client(url, http_client=...)`; `Client` does not take
-`headers=` directly.
-
-One trick worth knowing: `async with Client(mcp)` with the server object itself runs the whole
-protocol layer in memory, with no subprocess and no port. That is how you unit-test an MCP
-server.
-
-### 4.4 Plugging it into the LangGraph agent from post 4
-
-The agent from [post 4](#/blog/langgraph-ai-agents) is the host. It needs one client per server, fetches the tool
-definitions, converts them into LangChain tools, and forwards `tools/call` when the model picks
-one. LangChain 1.x ships that adapter in `langchain.mcp` (install `langchain[mcp]`, version
-1.4.0 or later; the API is in beta, and the old `langchain-mcp-adapters` package is archived):
-
-```python
-# LangChain 1.x, langchain[mcp] >= 1.4.0 (beta API)
-from langchain.agents import create_agent
-from langchain.mcp import MCPAdapter
-
-
-async def build_agent(model):
-    async with MCPAdapter("http://127.0.0.1:8000/mcp") as adapter:
-        tools = await adapter.list_tools()      # tools/list -> LangChain tools
-        return create_agent(model, tools)       # host: agent loop + tool calling
-```
-
-What MCP does *not* do for you is consent. In the [post 4](#/blog/langgraph-ai-agents) graph, the node that calls the refund
-tool has to pass through a "wait for human approval" node (a LangGraph interrupt) before
-`tools/call` is sent. The tool's `destructiveHint` is the signal that tells the host which
-tools need that node.
-
-## 5. When not to use MCP
+## 4. When not to use MCP
 
 MCP adds a process (or a service), a serialisation layer, and over HTTP an OAuth flow. That is
 a real cost, and it is not always worth paying.
@@ -787,7 +473,6 @@ large hosts, loading tools when needed rather than dumping all of them on every 
 - One tool call: `tools/list` tells the model what exists, the model proposes, the host asks for consent, `tools/call` executes, the result (text and structured) returns to the model.
 - Revision 2026-07-28 made MCP stateless: `_meta` on every request, `server/discover`, `subscriptions/listen` for notifications, MRTR instead of server-initiated requests; sampling and roots are deprecated.
 - Security is not in the protocol but in the host: treat tool descriptions and results as untrusted, least privilege, a human approving destructive actions.
-- Python SDK 2.x: `MCPServer` for servers, `Client` for clients; type hints become schemas; `mcp dev` to try it.
 
 The post 4 agent now has one standard socket for every tool. But a smart model with all the
 right tools in hand still drifts on long tasks: it forgets what it did, repeats mistakes, says
@@ -798,6 +483,5 @@ engineering, and MCP is only one piece of that harness.
 References: [MCP specification 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28),
 [Key changes 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/changelog),
 [Architecture overview](https://modelcontextprotocol.io/docs/learn/architecture),
-[MCP Python SDK docs](https://py.sdk.modelcontextprotocol.io/),
-[What's new in SDK v2](https://py.sdk.modelcontextprotocol.io/whats-new/),
-[LangChain MCP](https://docs.langchain.com/oss/python/langchain/mcp).
+[Security best practices](https://modelcontextprotocol.io/specification/latest/basic/security_best_practices),
+[Anthropic: Introducing MCP](https://www.anthropic.com/news/model-context-protocol).

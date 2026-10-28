@@ -280,9 +280,9 @@ whole loop. The model decides *what to do next*; the harness decides *within whi
 
 ### The folder tree: agent and harness visible at a glance
 
-The code below uses the Anthropic Python SDK 2.x (calling the Messages API directly, with a
-hand-written loop so every harness component is visible) and the MCP Python SDK 2.x for the tools.
-If you use LangGraph as in [post 4](#/blog/langgraph-ai-agents), each box in the diagram becomes a node and the graph state
+The design below assumes you call the model's API directly through the official SDK and write the
+loop yourself, so every harness component is visible instead of hidden inside a framework; the tools
+can be wrapped as MCP. If you use LangGraph as in [post 4](#/blog/langgraph-ai-agents), each box in the diagram becomes a node and the graph state
 replaces `progress.json`; the harness components stay the same, they just move house.
 
 ```text
@@ -297,10 +297,10 @@ research-agent/
 │   │   └── compaction.md     # history-summary prompt: what to keep, what to drop
 │   └── report_schema.py      # report structure: paragraphs + [n] + source list
 ├── tools/                    # what the agent can do (can be wrapped as MCP)
-│   ├── registry.py           # ToolSpec: name, description, schema, fn, policy flags
+│   ├── registry.py           # tool directory: name, description, schema, policy flags
 │   ├── search.py             # web search: domain filter, compact title+url+snippet
 │   ├── fetch.py              # page -> clean text, truncated to a cap, raw copy saved
-│   ├── notes.py              # structured notes: claim, quote, url
+│   ├── notes.py              # write and read back structured notes: claim, quote, url
 │   ├── submit_report.py      # runs verifiers; returns errors for the model to fix
 │   └── mcp_server.py         # exposes the tools above over MCP for other agents to reuse
 ├── harness/                  # what governs the loop, independent of the model
@@ -356,13 +356,13 @@ measures again, and if the history is still too long it calls the model with `co
 summarize the older part into one passage, keeping exactly what the prompt asks for: the plan,
 which sub-questions are closed, which sources were read and which not, open doubts. The new history
 is the summary plus the last few turns. The agent does not panic about lost detail: the detail is
-in `notes.md`, and it can call `read_notes`.
+in `notes.md`, and it can call the notes tool to read them back.
 
 Step 20: the model sees that every sub-question has at least two sources, writes a draft, and
 calls `submit_report`. This is where the harness shows its intent: submitting the report *is a
 tool*, and that tool runs `verifiers/`. `citations.py` finds that paragraph three states a number
 without a `[n]`, and that `[4]` points to a URL that appeared in search results but was never
-`fetch`ed. The tool returns `is_error: true` with two lines naming the paragraph, the URL, and the
+`fetch`ed. The tool returns an error result with two lines naming the paragraph, the URL, and the
 fix ("fetch the URL and take a note, or drop the claim"). The model fetches the page, takes a note,
 repairs the draft, and resubmits at step 23. The verifiers pass, `report.md` is written,
 `progress.json` flips to `done: true`, the loop stops.
@@ -375,262 +375,70 @@ line per step and per tool call; `run_evals.py` reruns this question and 29 othe
 and reports pass^3, the number that tells you how *consistent* the system is, not just whether it is
 sometimes right.
 
-### Code skeletons for the four pieces that matter
+### The four pieces that decide reliability
 
-**The loop.** Every harness decision lives on the lines that do not call the model: the policy gate
-before a tool, compaction before a call, state saved after every step, and stop conditions the model
-does not own.
+You do not need to read code to understand this harness. You need to know what each piece does,
+where it sits in the tree, and why the system drifts without it.
 
-```python
-# agent/loop.py  (Anthropic Python SDK 2.x)
-import anthropic
-from harness import budget, context, policy, state, tracing
-from tools.registry import REGISTRY
+| Piece | Lives in | What it does | Why it must exist |
+|---|---|---|---|
+| The loop | agent/loop.py | calls the model, runs tools, saves state, decides to stop | the model may not declare itself done |
+| Policy gate | harness/policy.py | approves every tool call before it runs | blocks unknown domains, forbidden tools, overuse |
+| Verifiers | harness/verifiers/ | check the report with plain code | a model grading itself always finds itself right |
+| Compaction | harness/context.py | clears old results, then summarizes | long jobs outgrow one context window |
 
-def run(question: str, cfg: dict, run_id: str) -> state.Progress:
-    client = anthropic.Anthropic()
-    prog = state.load_or_create(run_id, question)      # progress.json + notes.md
-    messages = state.load_messages(run_id) or [
-        {"role": "user", "content": question}]
-    tracer = tracing.Tracer(run_id)
+**The loop.** Each turn does one fixed sequence: check the budget (steps, tokens) and stop if it is
+spent; compact the context if it is over the threshold; call the model with the system prompt, a
+condensed `progress.json` and the tool list; if the model calls tools, pass each call through the
+policy gate before running it and hand the result (including errors, with a reason) back to the
+model; at the end of the turn save `progress.json` so the next session can resume. Two design
+decisions live here. First, the model going quiet does not mean done: the only path to "done" is
+`submit_report` passing the verifiers; if the model stops without submitting, the loop tells it to
+continue. That is the course's *pass-state gating* applied to a report instead of a feature. Second, a
+refused tool call still gets an answer with a reason, so the model changes course instead of being
+silently ignored. When the budget runs out, the loop does not try to submit an unverified report; it
+writes a handoff and exits.
 
-    while not prog.done:
-        # Stop conditions belong to the harness, not to the model.
-        if budget.exhausted(prog, cfg):
-            state.write_handoff(prog, reason="budget")
-            break
-        # Compact before calling the model, only when over the threshold.
-        messages = context.maybe_compact(client, messages, prog, cfg)
+**Tools and their descriptions.** A tool description is a prompt: it tells the model when to use the
+tool, what the parameters mean, what comes back, and the most important warning in this system:
+search results are candidates only, a page must be fetched before it can be cited. The body of the
+tool takes care of saving context: it filters by the domain allow-list, returns only a title, a URL
+and one snippet, and records the URLs it has shown in the state so the verifiers can cross-check. Each
+tool carries two flags, *read-only* and *uses the network*, so the policy gate can decide without
+knowing each tool; that is the same idea as MCP's tool annotations from
+[post 5](#/blog/mcp-model-context-protocol). If another agent should reuse the tool set,
+`tools/mcp_server.py` simply exposes the same functions over MCP, without rewriting the logic.
 
-        resp = client.messages.create(
-            model=cfg["model"],
-            max_tokens=16000,
-            system=state.render_system(prog),          # system.md + condensed state
-            tools=REGISTRY.schemas(),
-            messages=messages,
-        )
-        tracer.model_call(prog.step, resp.usage, resp.stop_reason)
-        budget.record(prog, resp.usage)
+**The citation verifier.** A verifier is plain code with no model call, so it cannot "talk itself
+into" deciding an issue is not a big deal, which is what Anthropic observed in an untuned LLM
+evaluator. It runs three checks: any paragraph that states a figure must carry a citation mark; every
+citation mark must appear in the source list at the end of the report; and the source's URL must be
+in the list of URLs *actually fetched*, which the harness records when the `fetch` tool runs, not
+something the model claims. A URL that merely appeared in search results is not enough to be cited.
+Every error comes back with its fix ("fetch the URL and take a note, or drop the claim"). This blocks
+the "invented source" failure structurally, not with a line in the prompt.
 
-        if resp.stop_reason == "end_turn":
-            # Stopped without submit_report: remind it; bare text is not accepted.
-            messages.append({"role": "assistant", "content": resp.content})
-            messages.append({"role": "user", "content":
-                "No report has been submitted through submit_report yet. Continue."})
-            prog.step += 1
-            continue
-        if resp.stop_reason == "pause_turn":           # a server tool paused; resend
-            messages.append({"role": "assistant", "content": resp.content})
-            continue
+**Compaction.** Two tiers, light to heavy, always trying the light one first. Tier one clears the
+contents of old tool results and keeps the six most recent; no decision is lost, because decisions
+live in the model's own words, not in tool output. If the history is still too long, tier two calls
+the model with `compaction.md` to summarize the older part into one passage, keeping the plan and the
+status of each sub-question, URLs read and not yet read, open doubts and decisions made, and dropping
+page contents already captured in notes and searches that found nothing. The new history is the
+summary plus the last few turns; the detail is always still in `notes.md`. On the Claude API you can
+replace tier one with the context editing feature and tier two with server-side compaction (both in
+beta); understanding the hand-designed version tells you what you are switching on. One caution: on
+the newest models, editing history that was already sent can invalidate earlier reasoning blocks, so
+check the model docs before compacting by overwriting.
 
-        messages.append({"role": "assistant", "content": resp.content})
-        results = []
-        for call in (b for b in resp.content if b.type == "tool_use"):
-            verdict = policy.check(call.name, call.input, prog, cfg)
-            if not verdict.allowed:                    # policy gate: refuse with a reason
-                out = f"Refused: {verdict.reason}"
-                is_error = True
-            else:
-                out, is_error = REGISTRY.run(call.name, call.input, prog)
-            tracer.tool_call(prog.step, call.name, call.input, is_error)
-            results.append({"type": "tool_result", "tool_use_id": call.id,
-                            "content": out, "is_error": is_error})
-        messages.append({"role": "user", "content": results})
-
-        prog.step += 1
-        state.save(prog, messages)                     # the next session resumes here
-    return prog
-```
-
-Two details deserve attention. First, `end_turn` is not "done": the only way to be done is
-`submit_report` passing the verifiers and flipping `prog.done`. That is the course's *pass-state
-gating* applied to a report instead of a feature. Second, a refused tool still returns a
-`tool_result` with `is_error`, so the model learns why and changes course instead of being silently
-ignored.
-
-**One tool.** A tool description is a prompt. It tells the model when to use the tool, what the
-parameters mean, and what comes back. The body of the tool takes care of saving context.
-
-```python
-# tools/search.py
-from tools.registry import ToolSpec
-
-def search(query: str, max_results: int = 8, *, prog, cfg) -> tuple[str, bool]:
-    allowed = cfg["permissions"]["allowed_domains"]
-    hits = [h for h in cfg["search_backend"](query, max_results * 2)
-            if any(h.domain.endswith(d) for d in allowed)][:max_results]
-    if not hits:
-        return ("No results within the allowed domains. "
-                "Try different or more specific keywords.", True)
-    # Return only high-signal fields: title, URL, one snippet. No HTML, no ids.
-    lines = [f"- {h.title}\n  {h.url}\n  {h.snippet[:200]}" for h in hits]
-    prog.seen_urls.update(h.url for h in hits)        # verifiers cross-check against this
-    return "\n".join(lines), False
-
-SEARCH = ToolSpec(
-    name="search",
-    description=(
-        "Search the web within the allowed source domains (vendor engineering blogs, "
-        "repos, papers). Use it to find SOURCES for one sub-question at a time. "
-        "Results are candidates only: a page must be fetched before it is cited."
-    ),
-    input_schema={
-        "type": "object",
-        "properties": {
-            "query": {"type": "string",
-                      "description": "Short query, 3-8 keywords, in English"},
-            "max_results": {"type": "integer", "minimum": 1, "maximum": 10,
-                            "description": "Default 8; raise when recall is low"},
-        },
-        "required": ["query"],
-        "additionalProperties": False,
-    },
-    fn=search,
-    read_only=True,
-    network=True,
-)
-```
-
-`ToolSpec` carries the two flags `read_only` and `network` so `policy.py` can decide without knowing
-each tool; that is the same idea as MCP's tool *annotations* from [post 5](#/blog/mcp-model-context-protocol). If another agent should
-reuse this tool set, `tools/mcp_server.py` only has to wrap it:
-
-```python
-# tools/mcp_server.py  (MCP Python SDK 2.x)
-from mcp.server import MCPServer
-from tools import search as s
-
-mcp = MCPServer("research-tools")
-
-@mcp.tool()
-def search(query: str, max_results: int = 8) -> str:
-    """Search sources within the allowed domains. Returns title, url, snippet."""
-    text, _ = s.search(query, max_results, prog=..., cfg=...)
-    return text
-```
-
-**One verifier.** A verifier is plain code with no model call, so it cannot "talk itself into"
-deciding an issue is not a big deal, which is what Anthropic observed in an untuned LLM evaluator.
-The errors it returns must say how to fix the problem.
-
-```python
-# harness/verifiers/citations.py
-import re
-CITE = re.compile(r"\[(\d+)\]")
-
-def check_citations(report: str, prog) -> list[str]:
-    """Return a list of errors; empty means pass."""
-    body, _, sources = report.partition("\n## Sources\n")
-    src = dict(re.findall(r"^\[(\d+)\]\s+(\S+)", sources, flags=re.M))
-    errors = []
-
-    for i, para in enumerate(p for p in body.split("\n\n") if p.strip()):
-        if para.startswith("#"):
-            continue
-        has_number = re.search(r"\d", para) is not None
-        if has_number and not CITE.search(para):
-            errors.append(
-                f"Paragraph {i + 1} states a figure but has no [n]. "
-                "Cite a fetched source, or drop the figure.")
-
-    for n in set(CITE.findall(body)):
-        url = src.get(n)
-        if url is None:
-            errors.append(f"[{n}] is used but missing from ## Sources.")
-        elif url not in prog.fetched_urls:
-            errors.append(
-                f"[{n}] points to {url} but this URL was never fetched. "
-                "Call fetch and write_note before citing it.")
-    return errors
-```
-
-The key is `prog.fetched_urls`: it is ground truth recorded by the harness when `fetch` ran, not a
-claim made by the model. A URL that merely appeared in search results (`seen_urls`) is not enough to
-be cited. This blocks the "invented source" failure structurally, not with a line in the prompt.
-
-**The compaction step.** Two tiers, light to heavy, and always try the light one first.
-
-```python
-# harness/context.py
-from harness import budget
-
-def maybe_compact(client, messages, prog, cfg):
-    trig = cfg["compaction"]["trigger_tokens"]
-    if budget.estimate_tokens(messages) < trig:
-        return messages
-
-    # Tier 1: clear old tool_result contents, keep the N most recent. No decisions lost.
-    keep = cfg["compaction"]["keep_recent_tool_results"]
-    seen = 0
-    for msg in reversed(messages):
-        if msg["role"] != "user" or not isinstance(msg["content"], list):
-            continue
-        for block in msg["content"]:
-            if block.get("type") == "tool_result":
-                seen += 1
-                if seen > keep:
-                    block["content"] = "[cleared during compaction; details in notes.md]"
-    if budget.estimate_tokens(messages) < trig:
-        return messages
-
-    # Tier 2: summarize the older part with the model, following compaction.md.
-    old, recent = messages[:-6], messages[-6:]
-    summary = client.messages.create(
-        model=cfg["model"], max_tokens=4000,
-        system=open("agent/prompts/compaction.md").read(),
-        messages=old + [{"role": "user", "content":
-            "Summarize the history above so a fresh session can continue the work."}],
-    )
-    text = next(b.text for b in summary.content if b.type == "text")
-    prog.compactions += 1
-    return [{"role": "user", "content":
-             f"[History summary after {prog.compactions} compactions]\n{text}"}] + recent
-```
-
-`compaction.md` spells out what to keep: the plan and the status of each sub-question, URLs read
-and not yet read, open doubts, decisions made; and what to drop: page contents already captured in
-notes, searches that found nothing. On the Claude API you can replace tier 1 with the context
-editing feature and tier 2 with server-side compaction (both in beta); understanding the hand-written
-version tells you what you are switching on. One more caution: on the newest models, editing
-history that was already sent can invalidate earlier reasoning blocks, so check the model docs
-before compacting by overwriting.
-
-**Configuration and evidence.** `config.yaml` is where every "assumption about what the model
-cannot do yet" becomes a number, so it can be loosened as models improve:
-
-```yaml
-model: claude-opus-5-5
-limits:
-  max_steps: 40
-  token_budget: 400000
-compaction:
-  trigger_tokens: 120000
-  keep_recent_tool_results: 6
-permissions:
-  allowed_domains: [anthropic.com, langchain.com, github.com, arxiv.org]
-  fetch_max_bytes: 200000
-  fetch_timeout_s: 15
-verifiers:
-  min_sources: 3
-  require_citation_for_numbers: true
-```
-
-And `evals/tasks.jsonl`, one task per line with code-gradable criteria (pretty-printed here
-for readability; in the file each task is a single line):
-
-```json
-{
-  "id": "harness-evidence",
-  "question": "Evidence that changing the harness, not the model, changes agent results?",
-  "must_cite_domains": ["anthropic.com"],
-  "min_sources": 3,
-  "forbidden": ["uncited_number"]
-}
-```
-
-`run_evals.py` runs each task k times, grades the *outcome* (does `report.md` pass the graders) rather
-than the path, and reports both pass@k and pass^k. For a research agent whose users will trust the
-output, pass^k is the number to watch: 75% per trial sounds fine, but the chance that three trials
+**Configuration and evidence.** `config.yaml` is where every "assumption about what the model cannot
+do yet" becomes a number, to be loosened as models improve: which model; at most 40 steps and 400
+thousand tokens; compact above 120 thousand tokens, keeping the 6 most recent tool results; the domain
+allow-list, 200 KB and 15 seconds per page; at least 3 sources, and every figure must be cited.
+`evals/tasks.jsonl` holds one line per task: the question, the domains that must be cited, the
+minimum number of sources, and the failures that are forbidden (for example an uncited figure).
+`run_evals.py` runs each task k times, grades the *outcome* (does the final report pass the graders)
+rather than the path, and reports both pass@k and pass^k. For a research agent whose users will trust
+the output, pass^k is the number to watch: 75% per trial sounds fine, but the chance that three trials
 in a row all succeed is only about 42%.
 
 ## When you do not need the full harness

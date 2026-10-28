@@ -2,7 +2,7 @@
 title: "MCP: một giao thức chung giữa agent và tool"
 date: "2026-10-27"
 tags: ["mcp", "agents", "tools"]
-summary: "Vì sao LLM vất vả với API truyền thống, MCP giải quyết ra sao, cấu trúc từng thành phần theo spec 2026-07-28, và một MCP server tra cứu đơn hàng viết bằng Python SDK."
+summary: "Vì sao LLM vất vả với API truyền thống, MCP giải quyết ra sao qua từng thành phần và một vòng gọi tool, rồi cấu trúc chi tiết của host, client, server theo spec 2026-07-28."
 ---
 
 # MCP: một giao thức chung giữa agent và tool
@@ -12,14 +12,12 @@ LangGraph: nó tự chọn bước tiếp theo, biết rẽ nhánh, biết dừn
 đó chỉ giỏi được bằng đúng những tool nó có trong tay: tra cứu đơn hàng, hoàn tiền, tạo ticket
 CRM, gửi email. Và mỗi tool là một API khác nhau mà ai đó phải tự tay nối vào, viết riêng cho
 từng ứng dụng. Bài 4 chỉ nói các tool "nằm sau MCP server" rồi đi tiếp. Bài này mở cái hộp đó
-ra: MCP là gì, vì sao nó sửa được đúng điểm yếu ấy, bên trong có gì, và một server thật viết
-bằng Python trông ra sao.
+ra: MCP là gì, vì sao nó sửa được đúng điểm yếu ấy, và bên trong từng thành phần có gì.
 
 Mọi chi tiết giao thức trong bài được đối chiếu với bản spec hiện hành tại
 [modelcontextprotocol.io](https://modelcontextprotocol.io/specification/latest), revision
-**2026-07-28**, và với tài liệu MCP Python SDK 2.x (bản `mcp` 2.3.0, tháng 10/2026). Revision
-này thay đổi khá nhiều so với các bản 2025, nên chỗ nào khác với những gì bạn hay gặp trên
-mạng tôi sẽ nói rõ.
+**2026-07-28**. Revision này thay đổi khá nhiều so với các bản 2025, nên chỗ nào khác với
+những gì bạn hay gặp trên mạng tôi sẽ nói rõ.
 
 ## 1. LLM gặp khó gì với API truyền thống
 
@@ -137,7 +135,13 @@ dưới là toàn bộ các message, với MCP ở giữa.
 
 Điểm quan trọng nhất: *LLM chưa bao giờ chạm vào Orders API*. Nó chỉ thấy một schema gọn và
 một đoạn text kết quả. Mọi thứ về auth, URL, retry, định dạng nằm ở server, viết một lần,
-mọi host dùng chung.
+mọi host dùng chung. Nếu đơn không tồn tại, bước 7 thất bại và server trả kết quả có
+`isError` true kèm một câu gợi ý; model đọc được và hỏi lại khách số đơn.
+
+Bước 5 là phần MCP *không* làm thay bạn. Trong graph của [bài 4](#/blog/langgraph-ai-agents),
+nút gọi tool hoàn tiền đi qua một nút "chờ người duyệt" (interrupt của LangGraph) trước khi
+`tools/call` được gửi; `destructiveHint` của tool (mục 3.4) là tín hiệu cho host biết tool nào
+cần nút đó.
 
 ### 2.3 Khi danh sách tool thay đổi
 
@@ -219,158 +223,52 @@ và `id` nếu cần trả lời. MCP dùng đúng ba loại message của nó.
 
 Mỗi request phải mang hai trường bắt buộc trong `_meta`: `io.modelcontextprotocol/protocolVersion`
 và `io.modelcontextprotocol/clientCapabilities`; nên kèm `io.modelcontextprotocol/clientInfo`.
-Thiếu trường bắt buộc, server trả lỗi `-32602`. Đây là request `server/discover` thật:
+Thiếu trường bắt buộc, server trả lỗi `-32602`.
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "server/discover",
-  "params": {
-    "_meta": {
-      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-      "io.modelcontextprotocol/clientInfo": {
-        "name": "support-agent", "version": "0.3.0"
-      },
-      "io.modelcontextprotocol/clientCapabilities": { "elicitation": { "form": {} } }
-    }
-  }
-}
-```
+Thay vì in JSON, bảng dưới liệt kê những message bạn gặp nhiều nhất và trường nào đi trong
+mỗi message. Mọi request đều mang thêm `_meta` như trên.
 
-Và câu trả lời của server Orders:
+| Message | Chiều | Trường chính |
+|---|---|---|
+| `server/discover` request | client gửi | chỉ có `_meta` |
+| `server/discover` result | server trả | `supportedVersions`, `capabilities`, `instructions`, `ttlMs`, `cacheScope`; `serverInfo` trong `_meta` |
+| `tools/list` request | client gửi | `cursor` (tuỳ chọn, phân trang) |
+| `tools/list` result | server trả | `tools[]`, `nextCursor`, `ttlMs`, `cacheScope` |
+| `tools/call` request | client gửi | `name`, `arguments` |
+| `tools/call` result | server trả | `content[]`, `structuredContent`, `isError` |
+| `subscriptions/listen` request | client gửi | `notifications`: `toolsListChanged`, `promptsListChanged`, `resourcesListChanged`, `resourceSubscriptions[]` |
+| `notifications/tools/list_changed` | server đẩy | `_meta` có `subscriptionId` của luồng đã mở |
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "resultType": "complete",
-    "supportedVersions": ["2026-07-28", "2025-11-25"],
-    "capabilities": { "tools": { "listChanged": true }, "resources": {} },
-    "_meta": {
-      "io.modelcontextprotocol/serverInfo": { "name": "orders", "version": "1.0.0" }
-    },
-    "instructions": "Order numbers are digits only. Never guess an order id.",
-    "ttlMs": 3600000,
-    "cacheScope": "public"
-  }
-}
-```
+Vài trường đáng chú ý trong kết quả `server/discover`. `supportedVersions` là danh sách
+phiên bản server hiểu, ví dụ `2026-07-28` và `2025-11-25`. `capabilities` cho biết server có
+tools, resources, prompts hay không, và có báo `listChanged` không. `instructions` là chỗ
+server nói với model cách dùng nó ("số đơn chỉ gồm chữ số, đừng đoán"); host thường nối đoạn
+này vào system prompt. `ttlMs` và `cacheScope` là gợi ý cache, bắt buộc có trên các kết quả
+`*/list` và `resources/read`.
 
-`instructions` là chỗ server nói với model cách dùng nó; host thường nối đoạn này vào system
-prompt. `ttlMs` và `cacheScope` là gợi ý cache, bắt buộc có trên các kết quả `*/list` và
-`resources/read`.
+Với server Orders trong ví dụ, `tools/list` trả về đúng một tool. `name` là `lookup_order`,
+`title` là "Look up an order", `description` nói nó trả trạng thái, ngày giao dự kiến và tổng
+tiền của một đơn. `inputSchema` có một trường bắt buộc `order_id` kiểu string, mô tả "số đơn,
+không có dấu #". `outputSchema` có bốn trường: `order_id`, `status` (chỉ nhận một trong bốn
+giá trị processing, shipped, delivered, cancelled), `eta` (ngày ISO 8601) và `total_vnd` (số
+nguyên). `annotations` khai `readOnlyHint` true và `openWorldHint` false: tool chỉ đọc, trong
+một thế giới đóng.
 
-`tools/list` (ở đây tôi lược `_meta` cho ngắn; trên dây nó vẫn phải có):
-
-```json
-{ "jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {} }
-```
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 2,
-  "result": {
-    "resultType": "complete",
-    "tools": [
-      {
-        "name": "lookup_order",
-        "title": "Look up an order",
-        "description": "Return the status, delivery estimate and total of one order.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "order_id": {
-              "type": "string",
-              "description": "Order number without the # sign."
-            }
-          },
-          "required": ["order_id"]
-        },
-        "outputSchema": {
-          "type": "object",
-          "properties": {
-            "order_id": { "type": "string" },
-            "status": {
-              "type": "string",
-              "enum": ["processing", "shipped", "delivered", "cancelled"]
-            },
-            "eta": {
-              "type": "string",
-              "description": "Expected delivery date, ISO 8601."
-            },
-            "total_vnd": { "type": "integer" }
-          },
-          "required": ["order_id", "status", "eta", "total_vnd"]
-        },
-        "annotations": { "readOnlyHint": true, "openWorldHint": false }
-      }
-    ],
-    "ttlMs": 300000,
-    "cacheScope": "public"
-  }
-}
-```
-
-`tools/call` và kết quả:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 3,
-  "method": "tools/call",
-  "params": { "name": "lookup_order", "arguments": { "order_id": "4821" } }
-}
-```
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 3,
-  "result": {
-    "resultType": "complete",
-    "content": [
-      {
-        "type": "text",
-        "text": "Order 4821: shipped, ETA 2026-10-30, total 1,250,000 VND"
-      }
-    ],
-    "structuredContent": {
-      "order_id": "4821", "status": "shipped", "eta": "2026-10-30", "total_vnd": 1250000
-    },
-    "isError": false
-  }
-}
-```
-
-Khối `text` ở trên là câu tóm tắt cho dễ đọc; spec khuyên đặt bản JSON serialize của
-`structuredContent` vào đó để client chưa hiểu `outputSchema` vẫn dùng được.
+Một lần `tools/call` với `arguments` là `order_id` bằng "4821" trả về `content` gồm một khối
+text tóm tắt ("đơn 4821 đã gửi, dự kiến 30/10, tổng 1.250.000 đ"), `structuredContent` là
+object bốn trường đúng `outputSchema`, và `isError` false. Spec khuyên khối text nên là bản
+JSON serialize của `structuredContent`, để client chưa hiểu `outputSchema` vẫn dùng được.
 
 Hai loại lỗi cần phân biệt. **Lỗi giao thức** (tool không tồn tại, request sai cấu trúc) trả
 về dạng JSON-RPC `error`, ví dụ `-32602 Unknown tool`; model khó tự sửa. **Lỗi thực thi tool**
 (API lỗi, ngày sai định dạng, không tìm thấy đơn) trả về trong `result` với `isError: true` và
 một câu text giải thích; spec khuyên client đưa loại này cho model để nó tự sửa và gọi lại.
 
-Để bạn nhận ra khi gặp, đây là handshake của revision 2025-11-25 trở về trước:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "initialize",
-  "params": {
-    "protocolVersion": "2025-11-25",
-    "capabilities": { "elicitation": { "form": {} } },
-    "clientInfo": { "name": "support-agent", "version": "0.3.0" }
-  }
-}
-```
-
-Server trả `protocolVersion`, `capabilities`, `serverInfo`, `instructions`; client gửi
-`notifications/initialized`; sau đó mới được gọi `tools/list`. Trong bản mới, ba message
-này gộp thành một `server/discover` tuỳ chọn và phần `_meta` trên mỗi request.
+Để bạn nhận ra khi gặp, handshake của revision 2025-11-25 trở về trước gồm ba message: client
+gửi request `initialize` mang `protocolVersion`, `capabilities` và `clientInfo`; server trả
+`protocolVersion`, `capabilities`, `serverInfo`, `instructions`; client gửi notification
+`notifications/initialized`; sau đó mới được gọi `tools/list`. Trong bản mới, ba message này
+gộp thành một `server/discover` tuỳ chọn và phần `_meta` trên mỗi request.
 
 ### 3.4 Primitive phía server
 
@@ -431,30 +329,11 @@ cho phép điều đó, nên bản mới dùng mẫu **MRTR** (multi round-trip 
 kết quả tạm `resultType: "input_required"` chứa `inputRequests`, client thu thập câu trả lời,
 rồi **gửi lại request gốc** kèm `inputResponses` với một `id` mới.
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 7,
-  "result": {
-    "resultType": "input_required",
-    "inputRequests": {
-      "confirm": {
-        "method": "elicitation/create",
-        "params": {
-          "mode": "form",
-          "message": "Refund 1,250,000 VND for order #4821?",
-          "requestedSchema": {
-            "type": "object",
-            "properties": { "confirm": { "type": "boolean" } },
-            "required": ["confirm"]
-          }
-        }
-      }
-    },
-    "requestState": "opaque-signed-blob"
-  }
-}
-```
+Với tool hoàn tiền, kết quả tạm đó trông thế này: `resultType` là `input_required`;
+`inputRequests` có một mục, server tự đặt tên ví dụ `confirm`, với `method` là
+`elicitation/create` và `params` gồm `mode` form, một `message` cho người dùng ("Hoàn
+1.250.000 đ cho đơn #4821?") và `requestedSchema` mô tả một trường boolean tên `confirm`;
+cuối cùng là `requestState`.
 
 `requestState` là chuỗi mờ chỉ server hiểu; client phải gửi lại nguyên vẹn và không được đọc.
 Vì nó đi qua client, spec coi nó là đầu vào có thể bị giả mạo: nếu nó ảnh hưởng tới uỷ quyền
@@ -543,197 +422,7 @@ nguyên lệnh sẽ chạy và xin xác nhận trước khi cài server bằng "
 > Ghi nhớ: giao thức không thực thi được những nguyên tắc này; nó chỉ cho bạn chỗ để cắm
 > chúng vào. Host là nơi bạn phải cài chúng.
 
-## 4. Viết một MCP server bằng Python SDK
-
-Giờ biến mục 3 thành code: một server lộ ra tool `lookup_order`, một resource chính sách hoàn
-tiền, một resource template lịch sử đơn và một prompt triage.
-
-### 4.1 Cài đặt
-
-```bash
-uv add "mcp[cli]"        # hoặc: pip install "mcp[cli]"
-```
-
-Bản 2.x của SDK đổi tên lớp `FastMCP` thành `MCPServer` và **xoá** đường import cũ
-`mcp.server.fastmcp` (không chỉ deprecated). Nếu bạn thấy code `from mcp.server.fastmcp import
-FastMCP`, đó là SDK 1.x; đổi thành `from mcp.server import MCPServer`. Tên gói `fastmcp` trên
-PyPI là một dự án khác, không phải SDK chính thức.
-
-### 4.2 Server
-
-```python
-# orders_server.py  -  MCP Python SDK 2.x (mcp 2.3.0)
-from typing import Annotated, Literal
-
-from pydantic import BaseModel, Field
-
-from mcp.server import MCPServer
-from mcp.types import ToolAnnotations
-
-mcp = MCPServer("orders")
-
-# Thay cho Orders API thật: trong thực tế đây là một hàm gọi REST với API key
-# lấy từ biến môi trường của tiến trình server, không bao giờ từ model.
-ORDERS = {
-    "4821": {"status": "shipped", "eta": "2026-10-30", "total_vnd": 1_250_000},
-    "4822": {"status": "processing", "eta": "2026-11-03", "total_vnd": 390_000},
-}
-
-
-class Order(BaseModel):
-    """Kiểu trả về: SDK biến nó thành outputSchema và structuredContent."""
-
-    order_id: str
-    status: Literal["processing", "shipped", "delivered", "cancelled"]
-    eta: str = Field(description="Expected delivery date, ISO 8601.")
-    total_vnd: int
-
-
-@mcp.tool(
-    title="Look up an order",
-    annotations=ToolAnnotations(read_only_hint=True, open_world_hint=False),
-)
-def lookup_order(
-    order_id: Annotated[str, Field(description="Order number without the # sign.")],
-) -> Order:
-    """Return the status, delivery estimate and total of one order."""
-    row = ORDERS.get(order_id)
-    if row is None:
-        # Ném exception -> client nhận result isError: true kèm thông điệp,
-        # model đọc được và có thể hỏi lại khách số đơn.
-        raise ValueError(f"No order {order_id!r}. Ask the customer to re-check it.")
-    return Order(order_id=order_id, **row)
-
-
-@mcp.resource("policy://refunds", mime_type="text/markdown")
-def refund_policy() -> str:
-    """Refund policy the agent must follow before proposing a refund."""
-    return (
-        "# Refund policy\n\n"
-        "- Full refund within 14 days of delivery.\n"
-        "- Shipped orders: refund only after the parcel is returned.\n"
-        "- Above 5,000,000 VND a human must approve.\n"
-    )
-
-
-@mcp.resource("orders://{order_id}/history", mime_type="application/json")
-def order_history(order_id: str) -> dict[str, list[str]]:
-    """Status history of one order, newest last."""
-    return {"events": ["2026-10-25 created", "2026-10-27 shipped"]}
-
-
-@mcp.prompt(title="Triage a support ticket")
-def triage(ticket: Annotated[str, Field(description="Raw ticket text.")]) -> str:
-    """Classify a ticket and propose the next tool to call."""
-    return (
-        "Classify this ticket as order_status, refund, or other. "
-        "If it mentions an order number, call lookup_order first.\n\n" + ticket
-    )
-
-
-if __name__ == "__main__":
-    mcp.run()  # transport mặc định: stdio
-```
-
-Vài điểm SDK làm thay bạn, đối chiếu với mục 3.4:
-
-- Tên hàm thành `name`, docstring thành `description`, type hint thành `inputSchema`. `Annotated[..., Field(description=...)]` đưa mô tả vào từng thuộc tính; đây là chỗ bạn viết "cho model", không phải cho người.
-- Kiểu trả về là `outputSchema`. Trả `BaseModel`, `TypedDict` hay `dataclass` thì schema là chính nó; trả `int` hay `str` thì SDK bọc thành `{"result": ...}`. Muốn tắt, dùng `@mcp.tool(structured_output=False)`.
-- Tham số sai (thiếu `order_id`, sai kiểu) bị từ chối trước khi hàm chạy.
-- Hàm `def` thường chạy trong thread để không chặn server; dùng `async def` cho I/O.
-- Resource với placeholder trong URI tự thành resource template; tên placeholder phải trùng tên tham số, nếu không SDK báo lỗi ngay lúc import.
-- `mime_type` mặc định là `text/plain`; SDK không đoán, bạn phải khai.
-- Với stdio, `stdout` là đường dây giao thức: muốn log hãy dùng module `logging` (ghi ra `stderr`), đừng `print`.
-
-Chạy thử với Inspector (cần `npx`):
-
-```bash
-uv run mcp dev orders_server.py
-```
-
-Muốn phục vụ qua HTTP cho nhiều client, chỉ đổi lệnh chạy, không đổi code tool:
-
-```python
-mcp.run(transport="streamable-http", host="127.0.0.1", port=8000)
-# endpoint: http://127.0.0.1:8000/mcp
-```
-
-SDK 2.x phục vụ cả client 2026-07-28 lẫn client 2025 (handshake `initialize`) trên cùng
-endpoint, định tuyến theo header `MCP-Protocol-Version`, không cần cấu hình gì. Nếu tool của
-bạn không bao giờ gọi ngược client, bật `stateless_http=True` để mọi worker nhận được mọi
-request.
-
-### 4.3 Client gọi server
-
-Lớp `Client` trong SDK 2.x gộp transport, session và thương lượng phiên bản vào một context
-manager. Nó nhận một URL (Streamable HTTP), một `StdioServerParameters` (tiến trình con), hoặc
-chính đối tượng `MCPServer` để test trong bộ nhớ.
-
-```python
-# client_demo.py
-import anyio
-
-from mcp import Client, StdioServerParameters
-from mcp.types import TextResourceContents
-
-server = StdioServerParameters(command="uv", args=["run", "orders_server.py"])
-
-
-async def main() -> None:
-    async with Client(server) as client:          # discover + chọn phiên bản ở đây
-        print(client.server_capabilities)          # tools, resources, prompts...
-
-        tools = await client.list_tools()          # tools/list
-        print([t.name for t in tools.tools])       # ['lookup_order']
-
-        result = await client.call_tool("lookup_order", {"order_id": "4821"})
-        print(result.is_error)                     # False
-        print(result.structured_content)           # {'order_id': '4821', 'status': ...}
-
-        bad = await client.call_tool("lookup_order", {"order_id": "9999"})
-        print(bad.is_error)                        # True: model có thể tự sửa
-
-        policy = await client.read_resource("policy://refunds")   # resources/read
-        for block in policy.contents:
-            if isinstance(block, TextResourceContents):
-                print(block.text[:40])
-
-
-anyio.run(main)
-```
-
-Đổi sang server HTTP chỉ là đổi đối số: `async with Client("http://127.0.0.1:8000/mcp")`.
-Cần header hay OAuth thì tự tạo `httpx2.AsyncClient` và đưa vào
-`streamable_http_client(url, http_client=...)`; `Client` không nhận `headers=` trực tiếp.
-
-Một mẹo đáng dùng: `async with Client(mcp)` với chính đối tượng server chạy toàn bộ tầng giao
-thức trong bộ nhớ, không cần tiến trình con hay cổng mạng. Đó là cách viết unit test cho MCP
-server.
-
-### 4.4 Gắn vào agent LangGraph của bài 4
-
-Agent ở [bài 4](#/blog/langgraph-ai-agents) là host. Nó cần một client cho mỗi server, lấy định nghĩa tool, chuyển thành
-tool của LangChain, và khi model gọi thì chuyển tiếp `tools/call`. LangChain 1.x cung cấp sẵn
-adapter này trong `langchain.mcp` (cài `langchain[mcp]`, bản từ 1.4.0, hiện là beta, và gói
-`langchain-mcp-adapters` cũ đã lưu trữ):
-
-```python
-# LangChain 1.x, langchain[mcp] >= 1.4.0 (beta API)
-from langchain.agents import create_agent
-from langchain.mcp import MCPAdapter
-
-
-async def build_agent(model):
-    async with MCPAdapter("http://127.0.0.1:8000/mcp") as adapter:
-        tools = await adapter.list_tools()      # tools/list -> LangChain tools
-        return create_agent(model, tools)       # host: vòng lặp agent + tool calling
-```
-
-Phần MCP *không* làm thay bạn là consent. Trong graph của [bài 4](#/blog/langgraph-ai-agents), nút gọi tool hoàn tiền phải
-đi qua một nút "chờ người duyệt" (interrupt của LangGraph) trước khi `tools/call` được gửi.
-`destructiveHint` của tool là tín hiệu để host biết tool nào cần nút đó.
-
-## 5. Khi nào không cần MCP
+## 4. Khi nào không cần MCP
 
 MCP thêm một tiến trình (hoặc một dịch vụ), một lớp serialize, và với HTTP là cả OAuth. Đó là
 chi phí thật, và không phải lúc nào cũng đáng.
@@ -758,7 +447,6 @@ nạp tool khi cần, thay vì đổ hết lên mọi lượt gọi.
 - Một lần gọi tool: `tools/list` cho model biết có gì, model đề nghị, host xin phép, `tools/call` thực thi, kết quả (text và structured) quay về model.
 - Revision 2026-07-28 làm MCP stateless: `_meta` trên từng request, `server/discover`, `subscriptions/listen` cho thông báo, MRTR thay cho request ngược từ server; sampling và roots deprecated.
 - Bảo mật không nằm trong giao thức mà nằm ở host: coi mô tả và kết quả tool là không đáng tin, ít quyền nhất, con người duyệt thao tác phá huỷ.
-- Python SDK 2.x: `MCPServer` cho server, `Client` cho client; type hint thành schema; `mcp dev` để thử.
 
 Đến đây agent của bài 4 đã có một ổ cắm chuẩn cho mọi tool. Nhưng một model thông minh với
 đầy đủ tool trong tay vẫn "trôi" khi làm việc dài: quên mình đã làm gì, lặp lại lỗi cũ, báo
@@ -769,6 +457,5 @@ harness engineering, và MCP chỉ là một mảnh trong cái harness ấy.
 Nguồn tham khảo: [MCP specification 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28),
 [Key changes 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/changelog),
 [Architecture overview](https://modelcontextprotocol.io/docs/learn/architecture),
-[MCP Python SDK docs](https://py.sdk.modelcontextprotocol.io/),
-[What's new in SDK v2](https://py.sdk.modelcontextprotocol.io/whats-new/),
-[LangChain MCP](https://docs.langchain.com/oss/python/langchain/mcp).
+[Security best practices](https://modelcontextprotocol.io/specification/latest/basic/security_best_practices),
+[Anthropic: Introducing MCP](https://www.anthropic.com/news/model-context-protocol).

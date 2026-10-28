@@ -222,22 +222,12 @@ model (mô hình riêng, nhỏ hơn LLM nhiều) nhận một chunk và trả v�
 `text-embedding-3-small`. Độ gần thường đo bằng cosine similarity, tức góc giữa hai vector: 1 là
 cùng hướng, 0 là không liên quan.
 
-```python
-# Cosine similarity bằng Python thuần, để thấy "độ giống" chỉ là một phép tính.
-# Các embedding thật có hàng nghìn chiều, nhưng công thức y hệt.
-import math
-
-def cosine(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))          # tích vô hướng
-    norm_a = math.sqrt(sum(x * x for x in a))        # độ dài vector a
-    norm_b = math.sqrt(sum(y * y for y in b))        # độ dài vector b
-    return dot / (norm_a * norm_b)
-
-q  = [0.9, 0.1, 0.4]   # vector của câu hỏi (minh hoạ)
-c1 = [0.8, 0.2, 0.5]   # chunk nói về cùng chủ đề
-c2 = [0.1, 0.9, 0.0]   # chunk nói về chủ đề khác
-print(round(cosine(q, c1), 2), round(cosine(q, c2), 2))  # 0.98 0.2
-```
+Nói nôm na, hãy coi mỗi vector là một mũi tên chỉ ra một hướng trong một không gian có rất nhiều
+chiều; mỗi "hướng" ứng với một sắc thái ý nghĩa. Hai đoạn văn cùng nói về "làm việc từ xa khi
+thử việc" sẽ có hai mũi tên gần như chồng lên nhau, điểm cosine cỡ 0,8 đến 0,98. Một đoạn về
+trợ cấp thiết bị và một đoạn về nghỉ phép chỉ ra hai hướng khác hẳn, điểm cỡ 0,1 đến 0,3.
+Toàn bộ "độ giống nhau về nghĩa" chỉ là một phép tính góc như vậy, chạy rất nhanh trên hàng
+triệu mũi tên, và đó là lý do nó thay được việc một người đọc từng đoạn để tìm đoạn liên quan.
 
 **Vector store.** Nơi lưu từng chunk kèm vector và metadata, và quan trọng nhất, nơi trả lời
 nhanh câu hỏi "cho tôi k vector gần vector này nhất" trên hàng triệu vector. Với vài nghìn chunk,

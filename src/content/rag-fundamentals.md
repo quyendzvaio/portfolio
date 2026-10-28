@@ -228,22 +228,13 @@ embedding model (a separate model, much smaller than an LLM) takes a chunk and r
 for example 1,536 numbers with `text-embedding-3-small`. Closeness is usually measured with
 cosine similarity, the angle between two vectors: 1 means same direction, 0 means unrelated.
 
-```python
-# Cosine similarity in plain Python, to show that "similarity" is just arithmetic.
-# Real embeddings have thousands of dimensions, but the formula is identical.
-import math
-
-def cosine(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))          # dot product
-    norm_a = math.sqrt(sum(x * x for x in a))        # length of a
-    norm_b = math.sqrt(sum(y * y for y in b))        # length of b
-    return dot / (norm_a * norm_b)
-
-q  = [0.9, 0.1, 0.4]   # the question's vector (illustrative)
-c1 = [0.8, 0.2, 0.5]   # a chunk on the same topic
-c2 = [0.1, 0.9, 0.0]   # a chunk on a different topic
-print(round(cosine(q, c1), 2), round(cosine(q, c2), 2))  # 0.98 0.2
-```
+In plain words, think of each vector as an arrow pointing in some direction in a space with a
+great many dimensions, where each "direction" stands for a shade of meaning. Two passages that
+both talk about "remote work during probation" get two arrows that almost overlap, a cosine
+score of roughly 0.8 to 0.98. A passage about equipment allowance and one about annual leave
+point in quite different directions, a score of roughly 0.1 to 0.3. The whole of "similar in
+meaning" comes down to that one angle calculation, which runs very fast over millions of
+arrows, and that is why it can replace a person reading every passage to find the relevant one.
 
 **Vector store.** Where each chunk is kept with its vector and metadata, and above all, where the
 question "give me the k vectors nearest to this one" is answered quickly over millions of

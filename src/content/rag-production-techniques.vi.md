@@ -107,20 +107,10 @@ ngắt dòng, bí lắm mới cắt giữa câu. Về kỹ thuật, nó cắt th
 phân cách, thử đoạn văn trước (`\n\n`), đoạn
 nào vẫn quá dài mới xuống dòng (`\n`), rồi khoảng trắng, rồi ký tự. Ý tưởng: đơn vị lớn
 hơn (đoạn văn) thường gắn nghĩa với nhau hơn, nên cố giữ nguyên chúng khi còn có thể.
-Đây là mặc định hợp lý cho văn bản chung. Với LangChain 1.x, bộ cắt nằm trong package
-`langchain-text-splitters` (bản 1.1.x):
-
-```python
-# pip install langchain-text-splitters
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-splitter = RecursiveCharacterTextSplitter(
-    chunk_size=800,      # đo bằng ký tự (length_function mặc định là len)
-    chunk_overlap=120,   # ~15%: ý bị cắt đôi vẫn còn nguyên ở một bên
-    separators=["\n\n", "\n", " ", ""],  # thứ tự thử, đây cũng là mặc định
-)
-chunks = splitter.split_text(document_text)
-```
+Đây là mặc định hợp lý cho văn bản chung; trong LangChain 1.x nó là
+`RecursiveCharacterTextSplitter` trong package `langchain-text-splitters`, với hai tham
+số đáng quan tâm: kích thước chunk (khoảng 800 ký tự là điểm khởi đầu tốt) và overlap
+(10–15%, để một ý bị cắt đôi vẫn còn nguyên ở một bên).
 
 **Semantic chunking**: cắt ở chỗ tài liệu đổi chủ đề, giống như bạn đọc đến đâu thấy "à,
 sang ý khác rồi" thì gạch một đường ở đó. Máy làm việc này bằng cách embed từng câu, đi
@@ -205,17 +195,8 @@ bớt chi tiết sai (bài gốc gọi đó là "dense bottleneck").
 [Paper HyDE](https://arxiv.org/abs/2212.10496) (Gao và cộng sự, 2022) cho thấy nó vượt
 retriever không giám sát mạnh nhất lúc đó mà không cần dữ liệu huấn luyện.
 
-```python
-def hyde_search(question: str, llm, embed, index, k: int = 20):
-    """llm(prompt) -> str, embed(text) -> vector, index.search(vec, k) -> hits."""
-    fake = llm(
-        "Write one short paragraph that answers the question as if it were "
-        f"taken from an internal document. Question: {question}"
-    )
-    # Embed the hypothetical answer, NOT the question; wrong details get smoothed
-    # out because similar documents sit in the same region of the vector space.
-    return index.search(embed(fake), k)
-```
+Về mặt hệ thống, HyDE chỉ là một bước nhỏ thêm vào phía câu hỏi: một prompt yêu cầu
+mô hình viết một đoạn như trích từ tài liệu nội bộ, rồi embed đoạn đó thay cho câu hỏi.
 
 Giá: một lần gọi LLM mỗi câu hỏi và nguy cơ ngược: nếu câu hỏi thuộc lĩnh vực mô hình
 không biết, đoạn giả sẽ kéo tìm kiếm về hướng sai. Dùng khi retriever thuần embedding
@@ -276,17 +257,8 @@ giải thích: tài liệu hạng cao quan trọng hơn, nhưng hạng thấp v�
 mất hẳn như khi dùng hàm mũ, và hằng số k làm dịu ảnh hưởng của một hệ thống xếp hạng
 "lệch"; k = 60 được chọn trong thử nghiệm sơ bộ, gần tối ưu nhưng không nhạy cảm.
 
-```python
-def rrf(ranked_lists: list[list[str]], k: int = 60) -> list[tuple[str, float]]:
-    """ranked_lists: each inner list holds chunk ids, best first."""
-    scores: dict[str, float] = {}
-    for ranking in ranked_lists:
-        for rank, chunk_id in enumerate(ranking, start=1):
-            scores[chunk_id] = scores.get(chunk_id, 0.0) + 1.0 / (k + rank)
-    return sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
-
-fused = rrf([bm25_ids, dense_ids])[:80]   # feed the top 80 to the reranker
-```
+Trong hệ thống, bước fusion chỉ là một hàm nhỏ chạy trên hai danh sách id chunk; đầu ra
+khoảng 80 chunk đứng đầu đi tiếp sang reranker.
 
 *Weighted score fusion* giữ điểm nhưng quy cả hai về cùng một thang trước khi cộng, và
 cho bạn chọn tin bên nào hơn. Cụ thể là chuẩn hóa từng danh sách về [0, 1] (min-max trên
@@ -323,20 +295,9 @@ Khuôn chuẩn là **retrieve wide, rerank narrow**: lấy 50–150 ứng viên 
 giữ top-K nhỏ (3–10) cho mô hình. Anthropic trong bài Contextual Retrieval dùng 150
 ứng viên và giữ 20; với chatbot nội bộ tôi thường thấy 50 → 5 là đủ.
 
-```python
-# pip install sentence-transformers  (model from the Sentence Transformers docs)
-from sentence_transformers import CrossEncoder
-import torch
-
-reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L6-v2",
-                        activation_fn=torch.nn.Sigmoid())  # scores in [0, 1]
-
-pairs = [(question, chunk.text) for chunk in candidates]   # ~80 pairs
-scores = reranker.predict(pairs)
-top = sorted(zip(candidates, scores), key=lambda t: t[1], reverse=True)[:5]
-```
-
-Bảng model của Sentence Transformers ghi `ms-marco-MiniLM-L6-v2` đạt NDCG@10 74,30 trên
+Tự host thì `cross-encoder/ms-marco-MiniLM-L6-v2` của Sentence Transformers là điểm khởi
+đầu phổ biến: nhận từng cặp (câu hỏi, chunk), trả về một điểm trong khoảng 0–1. Bảng model
+của họ ghi nó đạt NDCG@10 74,30 trên
 TREC DL 19 ở khoảng 1.800 tài liệu/giây; bản L2 nhanh gấp đôi nhưng kém 3 điểm. Nếu
 không muốn tự host,
 [Cohere Rerank](https://docs.cohere.com/docs/rerank-overview) (hiện tại `rerank-v5.0-pro`
@@ -584,39 +545,12 @@ liên quan, mô hình có bị kéo đi nói sai không? Tỷ lệ claim *sai* t
 trả lời khi hệ thống có context liên quan (`mode="relevant"`) hoặc context nhiễu
 (`mode="irrelevant"`). Đo xem mô hình có bị context rác kéo đi không.
 
-RAGAS hiện ở bản 0.4.x và đang chuyển sang API mới `ragas.metrics.collections` (API cũ
-qua `SingleTurnSample` được đánh dấu deprecated từ 0.4, dự kiến bỏ ở 1.0). Chấm một mẫu
-với API mới, theo đúng ví dụ trong tài liệu:
-
-```python
-# pip install ragas openai        (ragas 0.4.x, collections API)
-from openai import AsyncOpenAI
-from ragas.llms import llm_factory
-from ragas.embeddings.base import embedding_factory
-from ragas.metrics.collections import (
-    Faithfulness, AnswerRelevancy, ContextPrecision, ContextRecall,
-)
-
-client = AsyncOpenAI()
-judge = llm_factory("gpt-4o-mini", client=client)       # the judge model
-emb = embedding_factory("openai", model="text-embedding-3-small", client=client)
-
-faith = Faithfulness(llm=judge)                       # reference-free
-relev = AnswerRelevancy(llm=judge, embeddings=emb)    # reference-free
-prec = ContextPrecision(llm=judge)                    # needs reference
-rec = ContextRecall(llm=judge)                        # needs reference
-
-async def score_one(row: dict) -> dict:
-    """row: user_input, response, retrieved_contexts (list[str]), reference."""
-    q, a, ctx, ref = (row["user_input"], row["response"],
-                      row["retrieved_contexts"], row["reference"])
-    f = await faith.ascore(user_input=q, response=a, retrieved_contexts=ctx)
-    r = await relev.ascore(user_input=q, response=a)
-    p = await prec.ascore(user_input=q, reference=ref, retrieved_contexts=ctx)
-    c = await rec.ascore(user_input=q, reference=ref, retrieved_contexts=ctx)
-    return {"faithfulness": f.value, "relevancy": r.value,
-            "ctx_precision": p.value, "ctx_recall": c.value}
-```
+RAGAS hiện ở bản 0.4.x và đang chuyển sang API mới (`ragas.metrics.collections`; API cũ
+qua `SingleTurnSample` bị đánh dấu deprecated từ 0.4, dự kiến bỏ ở 1.0). Về mặt hệ thống,
+cách dùng rất gọn: chọn một mô hình làm judge (và một model embedding cho response
+relevancy), tạo mỗi metric một lần, rồi với mỗi mẫu trong golden set đưa vào bốn thứ: câu
+hỏi, câu trả lời, danh sách context đã lấy, và đáp án mẫu. Mỗi metric trả về một số trong
+[0, 1]; metric reference-free chỉ cần ba thứ đầu.
 
 Ba điều cần cẩn thận với mọi metric dùng LLM: (1) judge có nhiễu, chạy hai lần ra hai
 số hơi khác, nên so sánh trên 50+ mẫu và nhìn xu hướng, không nhìn một số; (2) judge
@@ -646,28 +580,11 @@ phí của từng bước lồng nhau. Không có trace, mọi câu "sao nó tr�
 (mã nguồn mở, self-host được, có đánh giá, dataset, quản lý prompt),
 [LangSmith](https://docs.langchain.com/langsmith) (của LangChain nhưng trace được code
 không dùng LangChain), [Arize Phoenix](https://arize.com/docs/phoenix) (mã nguồn mở, dựa
-trên OpenTelemetry/OpenInference). Với Langfuse Python SDK v5:
-
-```python
-# pip install langfuse   (SDK v5; reads LANGFUSE_PUBLIC_KEY / SECRET_KEY / BASE_URL)
-from langfuse import get_client
-
-langfuse = get_client()
-
-def answer(question: str) -> str:
-    with langfuse.start_as_current_observation(as_type="span", name="rag") as root:
-        with langfuse.start_as_current_observation(as_type="span", name="retrieve") as s:
-            chunks = retrieve(question)                      # hybrid + rerank
-            s.update(output=[c.id for c in chunks])          # keep ids, not full text
-        with langfuse.start_as_current_observation(
-            as_type="generation", name="llm", model="gpt-4o-mini"
-        ) as g:
-            text = generate(question, chunks)
-            g.update(output=text)
-        root.update(output=text)
-    langfuse.flush()        # short-lived processes must flush before exit
-    return text
-```
+trên OpenTelemetry/OpenInference). Với Langfuse (Python SDK v5), bạn bọc mỗi bước của
+pipeline trong một *span* (một khoảng thời gian có tên: retrieve, rerank, generate), bọc
+lần gọi LLM trong một *generation* ghi kèm tên model, và các span lồng nhau thành một
+trace cho mỗi request. SDK gửi dữ liệu bất đồng bộ theo lô nên không làm chậm ứng dụng;
+ghi id chunk thay vì toàn văn để trace nhẹ.
 
 Mỗi trace nên ghi thêm: phiên bản prompt, phiên bản index, tên model embedding, cache
 hit hay không, và có fallback hay không. Đây là các trục để lát nữa cắt dashboard.

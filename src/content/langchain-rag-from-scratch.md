@@ -94,14 +94,9 @@ A chat model is the adapter that talks to an LLM. It takes a list of messages an
 `AIMessage`. In 1.x the recommended constructor is `init_chat_model` with a
 `"provider:model"` string; LangChain imports the matching partner package for you.
 
-```python
-from langchain.chat_models import init_chat_model
-
-llm = init_chat_model("ollama:llama3.1", temperature=0)   # local
-# llm = init_chat_model("openai:gpt-5.5", temperature=0)  # hosted
-reply = llm.invoke("Explain embeddings in one sentence.")
-print(reply.content)
-```
+For example, the string `ollama:llama3.1` points at a local model served by Ollama and
+`openai:gpt-5.5` at a hosted one; change the string and you change vendor, and the rest of the
+program never notices.
 
 Three methods you will use constantly: `invoke` (one call), `stream` (receive pieces as they
 arrive, for a live UI), and `bind_tools` (declare tools the model may ask to call).
@@ -129,15 +124,10 @@ A template is a prompt with holes. `ChatPromptTemplate.from_messages` takes a li
 `(role, text)` pairs; `{context}` and `{question}` are filled at run time.
 `MessagesPlaceholder` inserts a whole list of messages (chat history) in the middle.
 
-```python
-from langchain_core.prompts import ChatPromptTemplate
-
-prompt = ChatPromptTemplate.from_messages([
-    ("system", "Answer only from the context below. Cite [n].\n\n{context}"),
-    ("human", "{question}"),
-])
-messages = prompt.invoke({"context": "...", "question": "..."}).to_messages()
-```
+For example, the RAG template of the project below is a system message "Answer only from the
+context below. Cite [n]." followed by the `{context}` hole, and a human message that is just
+the `{question}` hole. At run time you pass the two values in and get back a list of messages
+ready to send to the model.
 
 - **In RAG:** this is where the grounding rules live: "use only the context, say so if it is not there, cite sources".
 - **In an agent:** `create_agent` takes `system_prompt` as a plain string; templates come in when you need a prompt that changes per user (through middleware).
@@ -186,14 +176,9 @@ similar meaning get two nearby vectors. The interface has two methods:
 `embed_documents(list[str])` at index time and `embed_query(str)` at question time.
 Construct one with `init_embeddings("provider:model")`, the same style as chat models.
 
-```python
-from langchain.embeddings import init_embeddings
-
-emb = init_embeddings("ollama:nomic-embed-text")
-# emb = init_embeddings("openai:text-embedding-3-small")
-vec = emb.embed_query("rotate API keys")
-print(len(vec))  # dimensions, e.g. 768
-```
+For example `ollama:nomic-embed-text` locally, `openai:text-embedding-3-small` hosted. Call
+`embed_query` with a short question and you get back a list of a few hundred numbers (768 for
+nomic-embed-text); that count is the vector's dimension.
 
 One rule you cannot break: **the question and the documents must be embedded by the same
 model.** Changing the embedding model means re-indexing everything.
@@ -253,14 +238,9 @@ reads; per the [tools docs](https://docs.langchain.com/oss/python/langchain/tool
 hints are required. A `runtime: ToolRuntime` parameter lets a tool read state, context and
 the store without exposing them to the model.
 
-```python
-from langchain.tools import tool
-
-@tool
-def search_docs(query: str) -> str:
-    """Search the internal docs. Returns numbered passages with their sources."""
-    return format_docs(retriever.invoke(query))
-```
+For example, the search tool of the project below is just a function that takes a `query`
+string, calls the retriever, and returns the numbered passages with their sources; its one-line
+docstring is everything the model knows about the tool.
 
 - **In RAG:** not needed; the retriever is called directly in the chain.
 - **In an agent:** everything the agent can do. A good tool has a clear name, a docstring that says when to use it, and returns text the model can read (number the sources so the model can cite them).
@@ -342,6 +322,11 @@ runbooks, onboarding guides, architecture decisions). Requirements: runs fully l
 Ollama, answers with source citations, has a CLI and one HTTP endpoint, and switches to a
 hosted model with nothing but an environment variable.
 
+This part deliberately prints no code. The "base code" here is the folder structure plus the
+system flow: every file in the tree calls exactly one component from section 2, so once you
+know what that file takes in and gives back, you can write it in a few dozen lines, and more
+importantly you know why it sits where it does.
+
 ### The folder structure
 
 Naming rule: each folder is a stage of the pipeline, each file is one LangChain component.
@@ -349,29 +334,29 @@ Someone new to the project only needs this tree to know which way the data flows
 
 ```text
 docs-rag/
-├── pyproject.toml            # deps: langchain, langchain-chroma, langchain-ollama...
-├── .env.example              # CHAT_MODEL, EMBEDDING_MODEL (provider:model)
+├── pyproject.toml            # dependencies: langchain, langchain-chroma, -ollama...
+├── .env.example              # CHAT_MODEL, EMBEDDING_MODEL as "provider:model"
 ├── data/
-│   └── raw/                  # source documents (.md); git-tracked
+│   └── raw/                  # source documents (.md); git-tracked, the only input
 ├── storage/
-│   └── chroma/               # persisted Chroma index; gitignored, rebuilt by ingest
+│   └── chroma/               # Chroma index on disk; gitignored, rebuilt by ingest
 ├── src/docs_rag/
-│   ├── config.py             # Settings: model names, paths, chunk_size, top_k
-│   ├── ingestion/            # STAGE 1: sources -> Document -> chunks
-│   │   ├── loaders.py        #   Document loader: .md -> Document(page_content, metadata)
-│   │   └── chunking.py       #   Text splitter: Document -> chunks, with stable chunk_id
-│   ├── indexing/             # STAGE 2: chunks -> vectors -> store
-│   │   ├── embeddings.py     #   init_embeddings(settings.embedding_model)
-│   │   └── vectorstore.py    #   Chroma: add_documents / similarity_search, persisted
-│   ├── retrieval/            # STAGE 3: question -> top-k chunks
-│   │   └── retriever.py      #   as_retriever(k) + format_docs() -> [n] for citations
-│   ├── generation/           # STAGE 4: chunks + question -> answer
-│   │   ├── prompts.py        #   grounded ChatPromptTemplate that requires citations
-│   │   ├── llm.py            #   init_chat_model(settings.chat_model)
+│   ├── config.py             # Settings: model names, paths, chunk_size, overlap, top_k
+│   ├── ingestion/            # STAGE 1 (offline): sources -> Document -> chunks
+│   │   ├── loaders.py        #   Document loader: each .md file -> 1 Document + metadata
+│   │   └── chunking.py       #   Text splitter: Document -> chunks + stable chunk_id
+│   ├── indexing/             # STAGE 2 (offline): chunks -> vectors -> store
+│   │   ├── embeddings.py     #   the embedding model, shared by indexing and querying
+│   │   └── vectorstore.py    #   Chroma: writes chunks at ingest, searches them at query
+│   ├── retrieval/            # STAGE 3 (online): question -> numbered top-k chunks
+│   │   └── retriever.py      #   retriever from the store + numbering [n] for citations
+│   ├── generation/           # STAGE 4 (online): chunks + question -> answer
+│   │   ├── prompts.py        #   grounded prompt: context only, citations required
+│   │   ├── llm.py            #   the chat model, temperature 0
 │   │   └── chain.py          #   LCEL: retriever | prompt | model | parser, plus sources
 │   ├── api/
-│   │   └── main.py           # FastAPI: POST /ask -> {answer, sources}
-│   └── cli.py                # python -m docs_rag.cli ask "question"
+│   │   └── main.py           # FastAPI: POST /ask: question in, answer + sources out
+│   └── cli.py                # CLI: one question from the terminal -> answer + sources
 ├── scripts/
 │   └── ingest.py             # offline: load -> split -> embed -> store
 ├── eval/
@@ -379,224 +364,76 @@ docs-rag/
 │   └── run_eval.py           # retriever hit rate, citation checks
 └── tests/
     ├── test_chunking.py      # splitter yields right-sized chunks with full metadata
-    └── test_chain.py         # run the chain with fake embeddings + a fake chat model
+    └── test_chain.py         # run the chain with a fake embedding + a fake chat model
 ```
 
 `ingestion` and `indexing` only run offline (when the documents change). `retrieval` and
 `generation` run for every question. The split guarantees that the per-request path never
-imports file-reading or chunking code.
+imports file-reading or chunking code, and that when something breaks you know which folder
+to open.
 
-### Install
+### What each part does, and why it lives there
 
-```bash
-uv init docs-rag && cd docs-rag
-uv add langchain langchain-ollama langchain-chroma langchain-text-splitters \
-       fastapi "uvicorn[standard]"
-# optional: uv add langchain-openai   (to switch to OpenAI via env)
-ollama pull llama3.1
-ollama pull nomic-embed-text
-```
+The table below is each file's "contract": what it takes, what it returns. Keep the contract
+and you can rewrite any file without touching the others.
 
-### config.py: one place for every parameter
+| File | Takes | Returns | LangChain component |
+|---|---|---|---|
+| `config.py` | environment variables | one immutable Settings object | none (plain Python) |
+| `ingestion/loaders.py` | the `data/raw` folder | list of Document with source and title metadata | Document loader |
+| `ingestion/chunking.py` | list of Document | list of chunks (also Document), each with chunk_id | Text splitter |
+| `indexing/embeddings.py` | Settings | the embedding model | Embeddings |
+| `indexing/vectorstore.py` | Settings + embeddings | Chroma opened from `storage/chroma` | Vector store |
+| `scripts/ingest.py` | nothing | a written index, prints document and chunk counts | wires the 4 files above |
+| `retrieval/retriever.py` | a question | top-k Document, and their numbered text form | Retriever |
+| `generation/prompts.py` | context + question | a list of messages | Prompt template |
+| `generation/llm.py` | Settings | the chat model | Chat model |
+| `generation/chain.py` | a question | answer + sources | LCEL |
+| `api/main.py`, `cli.py` | an HTTP request or a CLI argument | JSON answer + sources | none |
 
-```python
-# src/docs_rag/config.py
-import os
-from dataclasses import dataclass
-from pathlib import Path
+A few design decisions deserve a word, because they are where beginners usually go wrong.
 
-ROOT = Path(__file__).resolve().parents[2]
+**config.py holds every parameter, including model names as `"provider:model"`.** The
+defaults are `ollama:llama3.1` for chat and `ollama:nomic-embed-text` for embeddings, both
+local. Set the environment variable `CHAT_MODEL=openai:gpt-5.5` and the whole system runs on
+OpenAI; no other file knows about it. That is the "standard socket" benefit from section 1,
+made visible. The other numbers that matter: chunks of 800 characters with 120 characters of
+overlap (about 15%, so a sentence cut in half still appears whole in at least one chunk), and
+top-k of 4.
 
+**loaders.py is hand-written, no extra library.** For a Markdown corpus, a loader that
+subclasses `BaseLoader` only has to walk the folder, read each file, take the first heading
+line as `title`, and build one `Document` whose `source` is the relative path. Those two
+metadata fields travel with the chunk all the way to the answer; think about citations here.
+For PDFs, replace this file with `DoclingLoader` from `langchain-docling` (keeps tables and
+headings) or `PyPDFLoader` from `langchain-community` if you accept the sunset package.
+Nothing else changes, because everything else only sees `Document`.
 
-@dataclass(frozen=True)
-class Settings:
-    # "provider:model" strings, understood by init_chat_model / init_embeddings.
-    chat_model: str = os.getenv("CHAT_MODEL", "ollama:llama3.1")
-    embedding_model: str = os.getenv("EMBEDDING_MODEL", "ollama:nomic-embed-text")
-    raw_dir: Path = ROOT / "data" / "raw"
-    chroma_dir: Path = ROOT / "storage" / "chroma"
-    collection: str = "docs"
-    chunk_size: int = 800      # characters
-    chunk_overlap: int = 120   # ~15%, so a sentence cut in half still appears whole once
-    top_k: int = 4
+**chunking.py gives every chunk a stable id.** The splitter is
+`RecursiveCharacterTextSplitter` with `add_start_index` on, so each chunk knows its character
+offset in the original file. The chunk id is a hash of the pair (source, start offset). Why it
+matters: write to the vector store without ids and every ingest run adds another copy of every
+chunk, until the retriever returns four copies of the same passage. With stable ids, Chroma
+overwrites the old chunk: run ingest ten times and you still have one set.
 
+**embeddings.py and vectorstore.py each create exactly one object and keep it for the life of
+the process.** The embedding model is shared by both phases (the "same model" rule from
+section 2). Chroma opens with `persist_directory` pointing at `storage/chroma`, so the index
+survives restarts. I picked Chroma because it persists to a folder without a server, handles
+tens of thousands of chunks comfortably, and its LangChain API is identical to every other
+store. For FAISS or pgvector, this is the only file you edit.
 
-settings = Settings()
-```
+**retriever.py does two things.** One, it asks the vector store for a retriever with
+`search_type` similarity and k of 4. Two, a small function turns a list of `Document` into one
+block of text, each passage starting with its bracketed number and source file name. That
+number is the contract between the prompt and the API: the model writes `[2]`, the API knows
+which file `[2]` is.
 
-Set `CHAT_MODEL=openai:gpt-5.5` in `.env` and the whole system runs on OpenAI; no other file
-knows about it. That is the "standard interfaces" benefit from section 1, made visible.
+**prompts.py holds the grounded prompt.** This is text the model reads, not code, so here it
+is:
 
-### ingestion/loaders.py: sources into Documents
-
-```python
-# src/docs_rag/ingestion/loaders.py
-from collections.abc import Iterator
-from pathlib import Path
-
-from langchain_core.document_loaders import BaseLoader
-from langchain_core.documents import Document
-
-
-class MarkdownDirLoader(BaseLoader):
-    """One Document per .md file; metadata carries source and title for citations."""
-
-    def __init__(self, root: Path, glob: str = "**/*.md") -> None:
-        self.root, self.glob = root, glob
-
-    def lazy_load(self) -> Iterator[Document]:
-        for path in sorted(self.root.glob(self.glob)):
-            text = path.read_text(encoding="utf-8")
-            title = next(
-                (line[2:] for line in text.splitlines() if line.startswith("# ")),
-                path.stem,
-            )
-            yield Document(
-                page_content=text,
-                metadata={"source": str(path.relative_to(self.root)), "title": title},
-            )
-```
-
-You only define `lazy_load`; `load()` is inherited from `BaseLoader` and collects the list.
-For PDFs, swap this class for `DoclingLoader` from `langchain-docling` (keeps tables and
-headings) or `PyPDFLoader` from `langchain-community` if you accept the sunset package. The
-rest of the pipeline does not change, because everything else only sees `Document`.
-
-### ingestion/chunking.py: Documents into chunks with stable ids
-
-```python
-# src/docs_rag/ingestion/chunking.py
-import hashlib
-
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-from docs_rag.config import settings
-
-
-def split(docs: list[Document]) -> list[Document]:
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=settings.chunk_size,
-        chunk_overlap=settings.chunk_overlap,
-        add_start_index=True,  # metadata["start_index"] = char offset in the source file
-    )
-    chunks = splitter.split_documents(docs)
-    for chunk in chunks:
-        # id = hash(source, start_index): re-ingesting never duplicates rows in the store
-        key = f"{chunk.metadata['source']}:{chunk.metadata['start_index']}"
-        chunk.metadata["chunk_id"] = hashlib.sha1(key.encode()).hexdigest()[:16]
-    return chunks
-```
-
-That `chunk_id` matters more than it looks. Call `add_documents` without `ids` and every
-ingest run adds another copy of every chunk, until the retriever returns four copies of the
-same passage. With stable ids, Chroma upserts: run ingest ten times and you still have one
-set.
-
-### indexing/embeddings.py and indexing/vectorstore.py
-
-```python
-# src/docs_rag/indexing/embeddings.py
-from functools import lru_cache
-
-from langchain.embeddings import init_embeddings
-from langchain_core.embeddings import Embeddings
-
-from docs_rag.config import settings
-
-
-@lru_cache(maxsize=1)
-def get_embeddings() -> Embeddings:
-    return init_embeddings(settings.embedding_model)
-```
-
-```python
-# src/docs_rag/indexing/vectorstore.py
-from functools import lru_cache
-
-from langchain_chroma import Chroma
-
-from docs_rag.config import settings
-from docs_rag.indexing.embeddings import get_embeddings
-
-
-@lru_cache(maxsize=1)
-def get_vector_store() -> Chroma:
-    return Chroma(
-        collection_name=settings.collection,
-        embedding_function=get_embeddings(),
-        persist_directory=str(settings.chroma_dir),  # drop this line = in-memory only
-    )
-```
-
-I picked Chroma because it persists to a folder without a server, handles tens of thousands
-of chunks comfortably, and its LangChain API is identical to every other store. For FAISS,
-replace the function body with `FAISS(embedding_function=..., index=faiss.IndexFlatL2(dim),
-docstore=InMemoryDocstore(), index_to_docstore_id={})` and remember `save_local` and
-`load_local`. For Postgres, `PGVector` from `langchain-postgres`. No other file changes.
-
-### scripts/ingest.py: wiring stages 1 and 2
-
-```python
-# scripts/ingest.py
-from docs_rag.config import settings
-from docs_rag.indexing.vectorstore import get_vector_store
-from docs_rag.ingestion.chunking import split
-from docs_rag.ingestion.loaders import MarkdownDirLoader
-
-
-def main() -> None:
-    docs = MarkdownDirLoader(settings.raw_dir).load()      # loader
-    chunks = split(docs)                                   # splitter
-    store = get_vector_store()                             # embeddings + store
-    store.add_documents(chunks, ids=[c.metadata["chunk_id"] for c in chunks])
-    print(f"{len(docs)} documents -> {len(chunks)} chunks -> {settings.chroma_dir}")
-
-
-if __name__ == "__main__":
-    main()
-```
-
-This script is the whole indexing phase in six meaningful lines. `add_documents` calls the
-embedding model's `embed_documents` for you and writes vectors plus metadata into Chroma.
-
-### retrieval/retriever.py: question into numbered top-k chunks
-
-```python
-# src/docs_rag/retrieval/retriever.py
-from langchain_core.documents import Document
-
-from docs_rag.config import settings
-from docs_rag.indexing.vectorstore import get_vector_store
-
-
-def get_retriever():
-    # A Runnable: str in, list[Document] out; plugs straight into the chain
-    return get_vector_store().as_retriever(
-        search_type="similarity", search_kwargs={"k": settings.top_k}
-    )
-
-
-def format_docs(docs: list[Document]) -> str:
-    """Number passages [1]..[k] so the model can cite and the API can map back."""
-    parts = []
-    for i, doc in enumerate(docs, start=1):
-        src = doc.metadata.get("source", "?")
-        parts.append(f"[{i}] ({src})\n{doc.page_content}")
-    return "\n\n".join(parts)
-```
-
-`format_docs` is where you decide what the model "sees" as context. The bracketed number is
-the contract between the prompt and the API: the model writes `[2]`, the API knows which file
-`[2]` is.
-
-### generation/prompts.py: a grounded prompt that cites
-
-```python
-# src/docs_rag/generation/prompts.py
-from langchain_core.prompts import ChatPromptTemplate
-
-SYSTEM = """You answer questions about the team's internal documentation.
+```text
+You answer questions about the team's internal documentation.
 
 Rules:
 - Use ONLY the context below. If it does not contain the answer, say
@@ -605,241 +442,98 @@ Rules:
 - Keep answers short. Never invent a source number that is not in the context.
 
 Context:
-{context}"""
-
-RAG_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", SYSTEM),
-    ("human", "{question}"),
-])
+{context}
 ```
 
-Three rules, each blocking one failure: "only the context" blocks outside knowledge, "say you
-can't find it" blocks polite hallucination, "never invent a source number" blocks phantom
-citations.
+That is the system message; the human message is just `{question}`. Three rules, each
+blocking one failure: "only the context" blocks outside knowledge, "say you can't find it"
+blocks polite hallucination, "never invent a source number" blocks phantom citations.
 
-### generation/llm.py and generation/chain.py: composed with LCEL
+**chain.py composes everything with LCEL, and deliberately keeps the docs.** The chain takes a
+question string. Step one runs two branches side by side: the retriever fetches docs, the other
+branch keeps the question; the result is a dict with two keys. Step two adds an `answer` key
+to that dict through the generation branch: number the docs, fill the prompt, call the model,
+pull the text out with `StrOutputParser`. Because the docs are still in the dict, the answer
+function can return `sources` (number, file, title) without retrieving a second time. To
+stream the answer into a UI, call `stream` instead of `invoke` on the generation branch; LCEL
+handles the rest.
 
-```python
-# src/docs_rag/generation/llm.py
-from functools import lru_cache
+**cli.py and api/main.py call one function.** The RAG logic does not know whether it is being
+called from a terminal or over HTTP, so testing the chain needs no server, and adding a new
+front end (a Slack bot, say) is one thin file that never touches the pipeline.
 
-from langchain.chat_models import init_chat_model
-from langchain_core.language_models import BaseChatModel
+### The offline flow: ingest
 
-from docs_rag.config import settings
+You run the ingest script whenever the documents change. It does five things in order, each
+one a file in the tree: the loader reads `data/raw` into `Document`s; the splitter cuts them
+into chunks and attaches ids; the vector store takes the list of chunks and the list of ids,
+calls the embedding model to turn each chunk into a vector, then writes vector, text and
+metadata into `storage/chroma`. Finally it prints one line like "42 documents -> 388 chunks"
+so you notice unexpected changes to the index (the chunk count doubling after a splitter
+change is a signal to look again).
 
-
-@lru_cache(maxsize=1)
-def get_llm() -> BaseChatModel:
-    return init_chat_model(settings.chat_model, temperature=0)
-```
-
-```python
-# src/docs_rag/generation/chain.py
-from functools import lru_cache
-
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import (
-    RunnableLambda, RunnableParallel, RunnablePassthrough,
-)
-
-from docs_rag.generation.llm import get_llm
-from docs_rag.generation.prompts import RAG_PROMPT
-from docs_rag.retrieval.retriever import format_docs, get_retriever
-
-
-@lru_cache(maxsize=1)
-def build_chain():
-    # Generation branch: dict{docs, question} -> prompt -> model -> str
-    generate = (
-        RunnableLambda(
-            lambda x: {"context": format_docs(x["docs"]), "question": x["question"]}
-        )
-        | RAG_PROMPT
-        | get_llm()
-        | StrOutputParser()
-    )
-    # Full chain: keep docs so we can return sources, add an "answer" key
-    return (
-        RunnableParallel(docs=get_retriever(), question=RunnablePassthrough())
-        | RunnablePassthrough.assign(answer=generate)
-    )
-
-
-def answer_question(question: str) -> dict:
-    out = build_chain().invoke(question)
-    return {
-        "answer": out["answer"],
-        "sources": [
-            {"n": i, "source": d.metadata["source"], "title": d.metadata.get("title")}
-            for i, d in enumerate(out["docs"], start=1)
-        ],
-    }
-```
-
-Read the chain top to bottom: `RunnableParallel` takes the question string, runs two branches
-side by side (the retriever fetches docs, the passthrough keeps the question) and produces the
-dict `{docs, question}`. `assign(answer=generate)` keeps that dict and adds an `answer` key
-by running the `generate` branch. Because `docs` is still in the dict, `answer_question` can
-return the sources without retrieving a second time. To stream the answer into a UI, call
-`.stream` instead of `.invoke` on the `generate` branch; LCEL already handles the rest.
-
-### cli.py and api/main.py
-
-```python
-# src/docs_rag/cli.py
-import argparse
-import json
-
-from docs_rag.generation.chain import answer_question
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(prog="docs-rag")
-    sub = parser.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("ask").add_argument("question")
-    args = parser.parse_args()
-    print(json.dumps(answer_question(args.question), indent=2, ensure_ascii=False))
-
-
-if __name__ == "__main__":
-    main()
-```
-
-```python
-# src/docs_rag/api/main.py
-from fastapi import FastAPI
-from pydantic import BaseModel
-
-from docs_rag.generation.chain import answer_question
-
-app = FastAPI(title="docs-rag")
-
-
-class AskRequest(BaseModel):
-    question: str
-
-
-@app.post("/ask")
-def ask(req: AskRequest) -> dict:
-    return answer_question(req.question)
-```
-
-Both entry points call one function. The RAG logic does not know whether it is being called
-from a terminal or over HTTP, so testing the chain needs no server.
-
-### Running it
-
-```bash
-cp .env.example .env                       # keep the Ollama defaults
-cp -r ~/team-docs/*.md data/raw/
-uv run python scripts/ingest.py            # 42 documents -> 388 chunks -> storage/chroma
-uv run python -m docs_rag.cli ask "How do we rotate the production API keys?"
-uv run uvicorn docs_rag.api.main:app --reload
-curl -X POST localhost:8000/ask -H 'content-type: application/json' \
-     -d '{"question": "How do we rotate the production API keys?"}'
-```
-
-The output looks like:
-
-```json
-{
-  "answer": "Rotate keys in the admin console, then redeploy the gateway [1][3].",
-  "sources": [
-    {"n": 1, "source": "runbooks/api-keys.md", "title": "API key rotation"},
-    {"n": 2, "source": "onboarding/access.md", "title": "Getting access"},
-    {"n": 3, "source": "runbooks/gateway.md", "title": "Gateway deploys"}
-  ]
-}
-```
-
-Source `[2]` was retrieved but the model did not use it; that is normal, and it is exactly
-what you will measure in the eval step (how many retrieved chunks were actually useful).
-
-### How one question travels through the files
+### The online flow: how one question travels through the files
 
 ![Flow of one question through the docs-rag folder tree: scripts/ingest.py runs offline through loaders, chunking, embeddings and vectorstore; online, api/main.py calls generation/chain.py, which calls retrieval/retriever.py and indexing/vectorstore.py, then prompts.py and llm.py, and returns answer and sources](blog/langchain-rag-from-scratch-flow.svg)
 
-1. `POST /ask` reaches `api/main.py`; Pydantic validates the body and calls `answer_question`.
-2. `generation/chain.py` feeds the raw question into `RunnableParallel`; the `docs` branch calls the retriever.
-3. `retrieval/retriever.py` asks Chroma in `indexing/vectorstore.py`; Chroma calls `embed_query` from `indexing/embeddings.py` to turn the question into a vector.
+1. A `POST /ask` request with a question reaches `api/main.py`; Pydantic validates the body and calls the answer function in `chain.py`.
+2. `generation/chain.py` feeds the raw question into the parallel step; the docs branch calls the retriever.
+3. `retrieval/retriever.py` asks Chroma in `indexing/vectorstore.py`; Chroma calls `embed_query` from `indexing/embeddings.py` to turn the question into a vector, then finds the k nearest vectors.
 4. The four nearest chunks come back as `Document` objects, carrying `source` and `title` from the loader.
-5. `format_docs` numbers them `[1]`..`[4]`; `generation/prompts.py` fills `{context}` and `{question}` into two messages.
-6. `generation/llm.py` sends the messages to the chat model; `StrOutputParser` pulls the text out of the `AIMessage`.
-7. `chain.py` returns `{answer, sources}`; `main.py` serialises it as JSON.
+5. The numbering function in `retriever.py` turns them into a text block `[1]`..`[4]`; `generation/prompts.py` fills `{context}` and `{question}` into two messages.
+6. `generation/llm.py` sends the two messages to the chat model; `StrOutputParser` pulls the text out of the `AIMessage`.
+7. `chain.py` returns the answer with its sources; `main.py` serialises it as JSON.
+
+For the question "How do we rotate the production API keys?", the result looks like this: the
+answer is one or two sentences, each ending in `[1]` or `[1][3]`; the sources are three
+entries, each with a number, a file name (say `runbooks/api-keys.md`) and a title. Source `[2]`
+was retrieved but the model did not use it; that is normal, and it is exactly what you will
+measure in the eval step (how many retrieved chunks were actually useful).
 
 Each step is one file, and each file is one component from the table in section 2. When an
 answer is wrong, you know which file to open: wrong sources, look at `retrieval/` and
 `ingestion/chunking.py`; right sources but wrong answer, look at `generation/prompts.py` and
 the model.
 
-### Testing with fake components
+### Running, testing and extending it, in words
 
-`langchain-core` ships fakes so you can test the chain without Ollama or an API key:
+To run it you need four things: install the packages listed in `pyproject.toml` (langchain,
+langchain-ollama, langchain-chroma, langchain-text-splitters, fastapi); pull the two Ollama
+models, `llama3.1` and `nomic-embed-text`; copy your documents into `data/raw`; run the
+ingest script. Then ask through the CLI, or start FastAPI and send `POST /ask` with a body
+that has one field, `question`.
+
+To test without Ollama or an API key, `langchain-core` ships two fake components:
 `DeterministicFakeEmbedding` (fake but stable vectors per text) and `FakeListChatModel`
-(returns scripted replies in order). Because `get_llm` and `get_embeddings` are module-level
-functions, a test only needs to monkeypatch them.
+(returns scripted replies in order). `test_chain.py` swaps the two model factories in
+`embeddings.py` and `llm.py` for those fakes, ingests two small files into a temporary folder,
+asks one question, and checks three things: the answer contains `[1]`, the sources carry the
+right file name, and no metadata was lost along the way. It runs in under a second and catches
+the most common bugs.
 
-```python
-# tests/test_chain.py
-from langchain_core.embeddings import DeterministicFakeEmbedding
-from langchain_core.language_models.fake_chat_models import FakeListChatModel
-
-
-def test_answer_carries_sources(monkeypatch, tmp_path):
-    monkeypatch.setattr("docs_rag.indexing.embeddings.get_embeddings",
-        lambda: DeterministicFakeEmbedding(size=64))
-    monkeypatch.setattr("docs_rag.generation.llm.get_llm",
-        lambda: FakeListChatModel(responses=["Rotate in the console [1]."]))
-    # ... ingest 2 small files under tmp_path, then:
-    from docs_rag.generation.chain import answer_question
-    out = answer_question("how to rotate keys")
-    assert "[1]" in out["answer"] and out["sources"][0]["source"].endswith(".md")
-```
-
-This runs in under a second and catches the most common bugs: metadata lost along the way,
-`format_docs` numbering drift, the chain returning a missing key.
+To extend it, you edit exactly one file per change: a different model vendor is `.env`; a
+different vector store is `vectorstore.py`; PDFs are `loaders.py`; a different chunking
+strategy is `chunking.py` followed by a re-ingest; a new answering rule is `prompts.py`. The
+`eval` folder keeps the golden questions so that after every change you know whether you made
+things better or worse; [post 3](#/blog/rag-production-techniques) covers that measurement in
+depth.
 
 ### The agent variant: same retriever, plus a loop
 
 When you genuinely need agentic RAG (questions that require several lookups), the change
-lives outside the existing folders: wrap the retriever as a tool and hand it to
-`create_agent`. Everything in `ingestion`, `indexing` and `retrieval` is reused as is.
+lives outside the existing folders: add one file, `agent.py`, that wraps the retriever as a
+tool and hands it to `create_agent`. That tool, call it `search_docs`, is just a function that
+takes a `query` string, calls the retriever, and returns the numbered text block; its
+docstring tells the model "search the internal docs, returns passages with sources".
+`create_agent` receives the model name from Settings (it must be a model that supports tool
+calling), a tool list with that one entry, a `system_prompt` that says to answer only from
+search results and cite `[n]`, and a checkpointer so the history is remembered per
+`thread_id`. Everything in `ingestion`, `indexing` and `retrieval` is reused as is.
 
-```python
-# src/docs_rag/agent.py  (optional)
-from langchain.agents import create_agent
-from langchain.tools import tool
-from langgraph.checkpoint.memory import InMemorySaver
-
-from docs_rag.config import settings
-from docs_rag.retrieval.retriever import format_docs, get_retriever
-
-
-@tool
-def search_docs(query: str) -> str:
-    """Search the team's internal docs. Returns numbered passages with sources."""
-    return format_docs(get_retriever().invoke(query))
-
-
-agent = create_agent(
-    model=settings.chat_model,          # needs a model that supports tool calling
-    tools=[search_docs],
-    system_prompt="Answer only from search_docs. Cite [n]. Search again if needed.",
-    checkpointer=InMemorySaver(),       # history per thread_id
-)
-
-question = "Compare key rotation for prod and staging."
-result = agent.invoke(
-    {"messages": [{"role": "user", "content": question}]},
-    {"configurable": {"thread_id": "demo"}},
-)
-print(result["messages"][-1].content)
-```
-
-The model may call `search_docs` twice with two different queries and then synthesise. The
-price: the number of model calls is no longer fixed, and you have to read the trace to know
-what it searched. Keep `agent.py` next to `chain.py` as an option, not a replacement.
+For a question like "compare key rotation for prod and staging", the model may call
+`search_docs` twice with two different queries and then synthesise. The price: the number of
+model calls is no longer fixed, and you have to read the trace to know what it searched. Keep
+`agent.py` next to `chain.py` as an option, not a replacement.
 
 ### When not to use LangChain
 

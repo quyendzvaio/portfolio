@@ -92,14 +92,8 @@ Chat model là adapter nói chuyện với LLM. Nó nhận một danh sách mess
 `AIMessage`. Trong 1.x, cách khởi tạo khuyến nghị là `init_chat_model` với chuỗi
 `"provider:model"`; LangChain tự import partner package tương ứng.
 
-```python
-from langchain.chat_models import init_chat_model
-
-llm = init_chat_model("ollama:llama3.1", temperature=0)   # local
-# llm = init_chat_model("openai:gpt-5.5", temperature=0)  # hosted
-reply = llm.invoke("Giải thích embedding trong một câu.")
-print(reply.content)
-```
+Ví dụ chuỗi `ollama:llama3.1` trỏ vào model chạy local qua Ollama, `openai:gpt-5.5` trỏ vào
+model hosted; đổi chuỗi là đổi hãng, phần còn lại của chương trình không biết gì.
 
 Ba method bạn sẽ dùng nhiều: `invoke` (gọi một lần), `stream` (nhận từng mẩu để hiện dần lên
 UI), và `bind_tools` (khai báo tool để model có thể yêu cầu gọi). `with_structured_output`
@@ -126,15 +120,10 @@ Template là prompt có chỗ trống. `ChatPromptTemplate.from_messages` nhận
 `(role, text)`; `{context}` và `{question}` được điền lúc chạy. `MessagesPlaceholder` chèn cả
 một list message (lịch sử chat) vào giữa.
 
-```python
-from langchain_core.prompts import ChatPromptTemplate
-
-prompt = ChatPromptTemplate.from_messages([
-    ("system", "Chỉ trả lời từ context sau. Trích dẫn [n].\n\n{context}"),
-    ("human", "{question}"),
-])
-messages = prompt.invoke({"context": "...", "question": "..."}).to_messages()
-```
+Ví dụ, template RAG của dự án bên dưới gồm một message system "Chỉ trả lời từ context sau.
+Trích dẫn [n]." nối với chỗ trống `{context}`, và một message human chỉ là chỗ trống
+`{question}`. Lúc chạy bạn đưa vào hai giá trị và nhận lại một list message sẵn sàng gửi cho
+model.
 
 - **Trong RAG:** đây là nơi quy tắc grounding sống: "chỉ dùng context, không có thì nói không có, trích dẫn nguồn".
 - **Trong Agent:** `create_agent` nhận thẳng `system_prompt` dạng string; template dùng khi bạn cần prompt động theo người dùng (qua middleware).
@@ -181,14 +170,9 @@ vector gần nhau. Interface có hai method: `embed_documents(list[str])` khi in
 `embed_query(str)` khi hỏi. Khởi tạo bằng `init_embeddings("provider:model")`, cùng kiểu với
 chat model.
 
-```python
-from langchain.embeddings import init_embeddings
-
-emb = init_embeddings("ollama:nomic-embed-text")
-# emb = init_embeddings("openai:text-embedding-3-small")
-vec = emb.embed_query("rotate API keys")
-print(len(vec))  # số chiều, ví dụ 768
-```
+Ví dụ `ollama:nomic-embed-text` cho local, `openai:text-embedding-3-small` cho hosted. Gọi
+`embed_query` với một câu hỏi ngắn, bạn nhận về một list vài trăm số (768 với
+nomic-embed-text); con số đó là số chiều của vector.
 
 Một nguyên tắc không được phá: **câu hỏi và tài liệu phải được embed bằng cùng một model.**
 Đổi model embedding là phải index lại toàn bộ.
@@ -244,14 +228,9 @@ schema tham số và **docstring** làm mô tả cho model; theo
 buộc. Tham số `runtime: ToolRuntime` cho tool đọc state, context, store mà không lộ ra với
 model.
 
-```python
-from langchain.tools import tool
-
-@tool
-def search_docs(query: str) -> str:
-    """Tìm trong tài liệu nội bộ. Trả về các đoạn đánh số kèm nguồn."""
-    return format_docs(retriever.invoke(query))
-```
+Ví dụ, tool tìm tài liệu của dự án bên dưới chỉ là một hàm nhận `query` dạng string, gọi
+retriever, và trả về các đoạn đã đánh số kèm nguồn; docstring một dòng của nó là tất cả
+những gì model biết về tool.
 
 - **Trong RAG:** không cần, retriever gọi trực tiếp trong chain.
 - **Trong Agent:** là mọi thứ agent có thể làm. Tool tốt có tên rõ, docstring nói khi nào dùng, và trả về text mà model đọc được (đánh số nguồn để model trích dẫn).
@@ -328,6 +307,11 @@ Bài toán: một bot hỏi đáp trên tài liệu nội bộ của team (thư 
 onboarding, quyết định kiến trúc). Yêu cầu: chạy hoàn toàn local bằng Ollama, trả lời có
 trích dẫn nguồn, có CLI và một endpoint HTTP, đổi sang model hosted chỉ bằng biến môi trường.
 
+Phần này cố ý không in code. "Base code" ở đây là cấu trúc thư mục cộng với luồng hệ thống:
+mỗi file trong cây chỉ gọi đúng một component đã nói ở phần 2, nên khi bạn hiểu file đó nhận
+gì và trả gì, bạn tự viết được nó trong vài chục dòng, và quan trọng hơn là bạn biết vì sao
+nó nằm ở chỗ đó.
+
 ### Cấu trúc thư mục
 
 Nguyên tắc đặt tên: mỗi thư mục là một giai đoạn của pipeline, mỗi file là một component của
@@ -335,29 +319,29 @@ LangChain. Ai mới vào dự án chỉ cần đọc cây này là biết dữ l
 
 ```text
 docs-rag/
-├── pyproject.toml            # deps: langchain, langchain-chroma, langchain-ollama...
-├── .env.example              # CHAT_MODEL, EMBEDDING_MODEL (provider:model)
+├── pyproject.toml            # dependency: langchain, langchain-chroma, -ollama...
+├── .env.example              # CHAT_MODEL, EMBEDDING_MODEL dạng "provider:model"
 ├── data/
-│   └── raw/                  # tài liệu nguồn (.md); git-tracked
+│   └── raw/                  # tài liệu nguồn (.md); git-tracked, là đầu vào duy nhất
 ├── storage/
-│   └── chroma/               # index Chroma đã persist; gitignored, tạo lại bằng ingest
+│   └── chroma/               # index Chroma trên đĩa; gitignored, tạo lại bằng ingest
 ├── src/docs_rag/
-│   ├── config.py             # Settings: tên model, đường dẫn, chunk_size, top_k
-│   ├── ingestion/            # GIAI ĐOẠN 1: nguồn -> Document -> chunk
-│   │   ├── loaders.py        #   Document loader: .md -> Document(page_content, metadata)
+│   ├── config.py             # Settings: tên model, đường dẫn, chunk_size, overlap, top_k
+│   ├── ingestion/            # GIAI ĐOẠN 1 (offline): nguồn -> Document -> chunk
+│   │   ├── loaders.py        #   Document loader: mỗi file .md -> 1 Document + metadata
 │   │   └── chunking.py       #   Text splitter: Document -> chunk, gắn chunk_id ổn định
-│   ├── indexing/             # GIAI ĐOẠN 2: chunk -> vector -> store
-│   │   ├── embeddings.py     #   init_embeddings(settings.embedding_model)
-│   │   └── vectorstore.py    #   Chroma: add_documents / similarity_search, lưu ra disk
-│   ├── retrieval/            # GIAI ĐOẠN 3: câu hỏi -> top-k chunk
-│   │   └── retriever.py      #   as_retriever(k) + format_docs() đánh số [n] để citation
-│   ├── generation/           # GIAI ĐOẠN 4: chunk + câu hỏi -> câu trả lời
-│   │   ├── prompts.py        #   ChatPromptTemplate grounded, bắt buộc trích dẫn
-│   │   ├── llm.py            #   init_chat_model(settings.chat_model)
+│   ├── indexing/             # GIAI ĐOẠN 2 (offline): chunk -> vector -> store
+│   │   ├── embeddings.py     #   model embedding, dùng chung cho index và query
+│   │   └── vectorstore.py    #   Chroma: ghi chunk lúc ingest, tìm chunk lúc hỏi
+│   ├── retrieval/            # GIAI ĐOẠN 3 (online): câu hỏi -> top-k chunk đánh số
+│   │   └── retriever.py      #   retriever từ vector store + hàm đánh số [n] để citation
+│   ├── generation/           # GIAI ĐOẠN 4 (online): chunk + câu hỏi -> câu trả lời
+│   │   ├── prompts.py        #   prompt grounded: chỉ dùng context, bắt buộc trích dẫn
+│   │   ├── llm.py            #   chat model, temperature 0
 │   │   └── chain.py          #   LCEL: retriever | prompt | model | parser, kèm sources
 │   ├── api/
-│   │   └── main.py           # FastAPI: POST /ask -> {answer, sources}
-│   └── cli.py                # python -m docs_rag.cli ask "câu hỏi"
+│   │   └── main.py           # FastAPI: POST /ask nhận question, trả answer + sources
+│   └── cli.py                # CLI: hỏi một câu từ terminal, in answer + sources
 ├── scripts/
 │   └── ingest.py             # chạy offline: load -> split -> embed -> store
 ├── eval/
@@ -365,222 +349,71 @@ docs-rag/
 │   └── run_eval.py           # hit-rate của retriever, kiểm tra citation
 └── tests/
     ├── test_chunking.py      # splitter cho ra chunk đúng size, metadata đủ
-    └── test_chain.py         # chạy chain với fake embeddings + fake chat model
+    └── test_chain.py         # chạy chain với embedding giả + chat model giả
 ```
 
 Hai thư mục `ingestion` và `indexing` chỉ chạy offline (khi tài liệu đổi). `retrieval` và
 `generation` chạy cho mỗi câu hỏi. Tách như vậy để cái chạy mỗi request không bao giờ kéo theo
-code đọc file hay cắt chunk.
+code đọc file hay cắt chunk, và để khi có lỗi bạn biết mở thư mục nào.
 
-### Cài đặt
+### Từng phần làm gì, và vì sao nằm ở đó
 
-```bash
-uv init docs-rag && cd docs-rag
-uv add langchain langchain-ollama langchain-chroma langchain-text-splitters \
-       fastapi "uvicorn[standard]"
-# tuỳ chọn: uv add langchain-openai   (để đổi sang OpenAI bằng env)
-ollama pull llama3.1
-ollama pull nomic-embed-text
-```
+Bảng dưới là "hợp đồng" của từng file: nhận gì, trả gì. Nếu bạn giữ đúng hợp đồng này, bạn
+có thể viết lại bất kỳ file nào mà không động vào file khác.
 
-### config.py: một nơi cho mọi tham số
+| File | Nhận vào | Trả ra | Component LangChain |
+|---|---|---|---|
+| `config.py` | biến môi trường | một object Settings bất biến | không (Python thuần) |
+| `ingestion/loaders.py` | thư mục `data/raw` | list Document, metadata có source và title | Document loader |
+| `ingestion/chunking.py` | list Document | list chunk (cũng là Document), có chunk_id | Text splitter |
+| `indexing/embeddings.py` | Settings | model embedding | Embeddings |
+| `indexing/vectorstore.py` | Settings + embedding | Chroma đã mở từ `storage/chroma` | Vector store |
+| `scripts/ingest.py` | không | index đã ghi, in số document và chunk | ghép 4 file trên |
+| `retrieval/retriever.py` | câu hỏi | top-k Document, và bản text đánh số | Retriever |
+| `generation/prompts.py` | context + question | list message | Prompt template |
+| `generation/llm.py` | Settings | chat model | Chat model |
+| `generation/chain.py` | câu hỏi | answer + sources | LCEL |
+| `api/main.py`, `cli.py` | request HTTP hoặc tham số dòng lệnh | JSON answer + sources | không |
 
-```python
-# src/docs_rag/config.py
-import os
-from dataclasses import dataclass
-from pathlib import Path
+Vài quyết định thiết kế đáng nói, vì chúng là chỗ người mới hay làm sai.
 
-ROOT = Path(__file__).resolve().parents[2]
+**config.py giữ mọi tham số, kể cả tên model dạng `"provider:model"`.** Mặc định là
+`ollama:llama3.1` cho chat và `ollama:nomic-embed-text` cho embedding, cả hai chạy local.
+Đặt biến môi trường `CHAT_MODEL=openai:gpt-5.5` là cả hệ thống chạy trên OpenAI; không file
+nào khác biết chuyện đó. Đây chính là lợi ích "ổ cắm chuẩn" ở phần 1, nhìn thấy được. Hai số
+quan trọng còn lại: chunk dài 800 ký tự, overlap 120 ký tự (khoảng 15%, để câu bị cắt đôi vẫn
+xuất hiện nguyên vẹn ở ít nhất một chunk), và lấy top-k bằng 4.
 
+**loaders.py tự viết, không kéo thêm thư viện.** Với corpus Markdown, một loader kế thừa
+`BaseLoader` chỉ cần duyệt thư mục, đọc từng file, lấy dòng heading đầu tiên làm `title`, và
+tạo một `Document` với `source` là đường dẫn tương đối. Hai metadata đó sẽ đi theo chunk đến
+tận câu trả lời; nghĩ về citation ngay từ đây. Với PDF, thay file này bằng `DoclingLoader`
+của `langchain-docling` (giữ được bảng và heading) hoặc `PyPDFLoader` của
+`langchain-community` nếu bạn chấp nhận package đang sunset. Phần còn lại không đổi, vì tất
+cả chỉ thấy `Document`.
 
-@dataclass(frozen=True)
-class Settings:
-    # Chuỗi "provider:model": init_chat_model / init_embeddings tự hiểu.
-    chat_model: str = os.getenv("CHAT_MODEL", "ollama:llama3.1")
-    embedding_model: str = os.getenv("EMBEDDING_MODEL", "ollama:nomic-embed-text")
-    raw_dir: Path = ROOT / "data" / "raw"
-    chroma_dir: Path = ROOT / "storage" / "chroma"
-    collection: str = "docs"
-    chunk_size: int = 800      # đếm theo ký tự
-    chunk_overlap: int = 120   # ~15% để câu bị cắt đôi vẫn có mặt ở một chunk
-    top_k: int = 4
+**chunking.py gắn một id ổn định cho mỗi chunk.** Splitter là `RecursiveCharacterTextSplitter`
+với `add_start_index` bật, nên mỗi chunk biết vị trí ký tự của nó trong file gốc. Id của chunk
+là hash của cặp (source, vị trí bắt đầu). Vì sao quan trọng: nếu ghi vào vector store mà không
+có id, mỗi lần chạy ingest là thêm một bộ chunk trùng, và retriever bắt đầu trả về bốn bản của
+cùng một đoạn. Với id ổn định, Chroma ghi đè đúng chunk cũ: chạy ingest mười lần vẫn chỉ có
+một bộ.
 
+**embeddings.py và vectorstore.py mỗi file tạo đúng một object và giữ nó suốt tiến trình.**
+Embedding dùng chung cho cả hai pha (quy tắc "cùng một model" ở phần 2). Chroma mở với
+`persist_directory` trỏ vào `storage/chroma`, nên index sống qua các lần khởi động. Tôi chọn
+Chroma vì nó lưu ra một thư mục mà không cần server, đủ cho vài chục nghìn chunk, và API qua
+LangChain giống hệt mọi store khác. Muốn FAISS hay pgvector, chỉ sửa file này.
 
-settings = Settings()
-```
+**retriever.py làm hai việc.** Một là xin retriever từ vector store với `search_type` là
+similarity và k bằng 4. Hai là một hàm nhỏ biến list `Document` thành một khối text, mỗi đoạn
+mở đầu bằng số thứ tự trong ngoặc vuông và tên file nguồn. Số đó là hợp đồng giữa prompt và
+API: model viết `[2]`, API biết `[2]` là file nào.
 
-Đổi `CHAT_MODEL=openai:gpt-5.5` trong `.env` là cả hệ thống chạy trên OpenAI; không file nào
-khác biết chuyện đó. Đó chính là lợi ích "chuẩn hoá interface" ở phần 1, nhìn thấy được.
+**prompts.py chứa prompt grounded.** Đây là text model đọc, không phải code, nên in ra đây:
 
-### ingestion/loaders.py: nguồn thành Document
-
-```python
-# src/docs_rag/ingestion/loaders.py
-from collections.abc import Iterator
-from pathlib import Path
-
-from langchain_core.document_loaders import BaseLoader
-from langchain_core.documents import Document
-
-
-class MarkdownDirLoader(BaseLoader):
-    """Mỗi file .md thành một Document; metadata mang source và title để citation."""
-
-    def __init__(self, root: Path, glob: str = "**/*.md") -> None:
-        self.root, self.glob = root, glob
-
-    def lazy_load(self) -> Iterator[Document]:
-        for path in sorted(self.root.glob(self.glob)):
-            text = path.read_text(encoding="utf-8")
-            title = next(
-                (line[2:] for line in text.splitlines() if line.startswith("# ")),
-                path.stem,
-            )
-            yield Document(
-                page_content=text,
-                metadata={"source": str(path.relative_to(self.root)), "title": title},
-            )
-```
-
-Chỉ cần định nghĩa `lazy_load`; `load()` kế thừa từ `BaseLoader` sẽ gom thành list. Với PDF,
-thay class này bằng `DoclingLoader` từ `langchain-docling` (giữ được bảng và heading) hoặc
-`PyPDFLoader` từ `langchain-community` nếu bạn chấp nhận package đang sunset. Phần còn lại
-của pipeline không đổi, vì tất cả đều chỉ thấy `Document`.
-
-### ingestion/chunking.py: Document thành chunk có id ổn định
-
-```python
-# src/docs_rag/ingestion/chunking.py
-import hashlib
-
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-from docs_rag.config import settings
-
-
-def split(docs: list[Document]) -> list[Document]:
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=settings.chunk_size,
-        chunk_overlap=settings.chunk_overlap,
-        add_start_index=True,  # metadata["start_index"] = vị trí ký tự trong file gốc
-    )
-    chunks = splitter.split_documents(docs)
-    for chunk in chunks:
-        # id = hash(source, start_index): ingest lại không tạo bản sao trong store
-        key = f"{chunk.metadata['source']}:{chunk.metadata['start_index']}"
-        chunk.metadata["chunk_id"] = hashlib.sha1(key.encode()).hexdigest()[:16]
-    return chunks
-```
-
-Cái `chunk_id` quan trọng hơn vẻ ngoài của nó. Nếu bạn gọi `add_documents` không có `ids`,
-mỗi lần chạy ingest là thêm một bộ chunk trùng, retriever bắt đầu trả về bốn bản của cùng
-một đoạn. Với id ổn định, Chroma upsert: chạy ingest mười lần vẫn chỉ có một bộ.
-
-### indexing/embeddings.py và indexing/vectorstore.py
-
-```python
-# src/docs_rag/indexing/embeddings.py
-from functools import lru_cache
-
-from langchain.embeddings import init_embeddings
-from langchain_core.embeddings import Embeddings
-
-from docs_rag.config import settings
-
-
-@lru_cache(maxsize=1)
-def get_embeddings() -> Embeddings:
-    return init_embeddings(settings.embedding_model)
-```
-
-```python
-# src/docs_rag/indexing/vectorstore.py
-from functools import lru_cache
-
-from langchain_chroma import Chroma
-
-from docs_rag.config import settings
-from docs_rag.indexing.embeddings import get_embeddings
-
-
-@lru_cache(maxsize=1)
-def get_vector_store() -> Chroma:
-    return Chroma(
-        collection_name=settings.collection,
-        embedding_function=get_embeddings(),
-        persist_directory=str(settings.chroma_dir),  # bỏ dòng này = chỉ trong RAM
-    )
-```
-
-Tôi chọn Chroma vì nó persist ra một thư mục mà không cần server, đủ cho vài chục nghìn chunk,
-và API của nó qua LangChain giống hệt mọi store khác. Muốn FAISS: thay body hàm bằng
-`FAISS(embedding_function=..., index=faiss.IndexFlatL2(dim), docstore=InMemoryDocstore(),
-index_to_docstore_id={})` và nhớ `save_local`/`load_local`. Muốn Postgres: `PGVector` từ
-`langchain-postgres`. Không file nào khác phải sửa.
-
-### scripts/ingest.py: nối giai đoạn 1 và 2
-
-```python
-# scripts/ingest.py
-from docs_rag.config import settings
-from docs_rag.indexing.vectorstore import get_vector_store
-from docs_rag.ingestion.chunking import split
-from docs_rag.ingestion.loaders import MarkdownDirLoader
-
-
-def main() -> None:
-    docs = MarkdownDirLoader(settings.raw_dir).load()      # loader
-    chunks = split(docs)                                   # splitter
-    store = get_vector_store()                             # embeddings + store
-    store.add_documents(chunks, ids=[c.metadata["chunk_id"] for c in chunks])
-    print(f"{len(docs)} documents -> {len(chunks)} chunks -> {settings.chroma_dir}")
-
-
-if __name__ == "__main__":
-    main()
-```
-
-Script này là toàn bộ pha indexing trong sáu dòng có nghĩa. `add_documents` tự gọi
-`embed_documents` của model embedding rồi ghi vector và metadata vào Chroma.
-
-### retrieval/retriever.py: câu hỏi thành top-k chunk đánh số
-
-```python
-# src/docs_rag/retrieval/retriever.py
-from langchain_core.documents import Document
-
-from docs_rag.config import settings
-from docs_rag.indexing.vectorstore import get_vector_store
-
-
-def get_retriever():
-    # Runnable: nhận str, trả list[Document]; cắm thẳng vào chain được
-    return get_vector_store().as_retriever(
-        search_type="similarity", search_kwargs={"k": settings.top_k}
-    )
-
-
-def format_docs(docs: list[Document]) -> str:
-    """Đánh số [1]..[k] để model trích dẫn và để API map ngược về nguồn."""
-    parts = []
-    for i, doc in enumerate(docs, start=1):
-        src = doc.metadata.get("source", "?")
-        parts.append(f"[{i}] ({src})\n{doc.page_content}")
-    return "\n\n".join(parts)
-```
-
-`format_docs` là chỗ bạn quyết định model "nhìn thấy" context thế nào. Số thứ tự trong ngoặc
-vuông là hợp đồng giữa prompt và API: model viết `[2]`, API biết `[2]` là file nào.
-
-### generation/prompts.py: prompt grounded có trích dẫn
-
-```python
-# src/docs_rag/generation/prompts.py
-from langchain_core.prompts import ChatPromptTemplate
-
-SYSTEM = """You answer questions about the team's internal documentation.
+```text
+You answer questions about the team's internal documentation.
 
 Rules:
 - Use ONLY the context below. If it does not contain the answer, say
@@ -589,241 +422,92 @@ Rules:
 - Keep answers short. Never invent a source number that is not in the context.
 
 Context:
-{context}"""
-
-RAG_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", SYSTEM),
-    ("human", "{question}"),
-])
+{context}
 ```
 
-Ba quy tắc, mỗi quy tắc chặn một kiểu lỗi: "only the context" chặn kiến thức ngoài, "say you
-can't find" chặn bịa cho lịch sự, "never invent a source number" chặn citation ma. Prompt
-viết tiếng Anh vì model nhỏ chạy local tuân thủ chỉ dẫn tiếng Anh tốt hơn; câu hỏi và trả
-lời vẫn có thể tiếng Việt.
+Đó là message system; message human chỉ là `{question}`. Ba quy tắc, mỗi quy tắc chặn một kiểu
+lỗi: "only the context" chặn kiến thức ngoài, "say you can't find" chặn bịa cho lịch sự,
+"never invent a source number" chặn citation ma. Prompt viết tiếng Anh vì model nhỏ chạy local
+tuân thủ chỉ dẫn tiếng Anh tốt hơn; câu hỏi và trả lời vẫn có thể tiếng Việt.
 
-### generation/llm.py và generation/chain.py: ghép bằng LCEL
+**chain.py ghép tất cả bằng LCEL, và cố ý giữ lại docs.** Chain nhận một string câu hỏi. Bước
+một chạy song song hai nhánh: retriever lấy docs, nhánh kia giữ nguyên câu hỏi; kết quả là một
+dict có hai key. Bước hai thêm key `answer` vào dict đó bằng nhánh sinh câu trả lời: đánh số
+docs, điền prompt, gọi model, lấy text bằng `StrOutputParser`. Vì docs vẫn còn trong dict,
+hàm trả lời có thể trả cả `sources` (số thứ tự, file, title) mà không phải retrieve lần hai.
+Muốn stream câu trả lời ra UI, gọi `stream` thay vì `invoke` trên nhánh sinh; LCEL lo phần
+còn lại.
 
-```python
-# src/docs_rag/generation/llm.py
-from functools import lru_cache
+**cli.py và api/main.py chỉ gọi một hàm.** Logic RAG không biết nó đang được gọi từ terminal
+hay HTTP, nên test chain không cần dựng server, và thêm một giao diện mới (Slack bot chẳng hạn)
+là thêm một file mỏng, không đụng pipeline.
 
-from langchain.chat_models import init_chat_model
-from langchain_core.language_models import BaseChatModel
+### Luồng offline: ingest
 
-from docs_rag.config import settings
+Bạn chạy script ingest mỗi khi tài liệu đổi. Nó làm năm việc theo thứ tự, mỗi việc là một file
+trong cây: loader đọc `data/raw` thành `Document`; splitter cắt thành chunk và gắn id; vector
+store nhận list chunk cùng list id, gọi model embedding để biến từng chunk thành vector, rồi
+ghi vector, text và metadata vào `storage/chroma`. Cuối cùng nó in một dòng kiểu "42 documents
+-> 388 chunks" để bạn biết index có thay đổi bất thường không (số chunk tăng gấp đôi sau một
+lần đổi splitter là tín hiệu cần nhìn lại).
 
-
-@lru_cache(maxsize=1)
-def get_llm() -> BaseChatModel:
-    return init_chat_model(settings.chat_model, temperature=0)
-```
-
-```python
-# src/docs_rag/generation/chain.py
-from functools import lru_cache
-
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import (
-    RunnableLambda, RunnableParallel, RunnablePassthrough,
-)
-
-from docs_rag.generation.llm import get_llm
-from docs_rag.generation.prompts import RAG_PROMPT
-from docs_rag.retrieval.retriever import format_docs, get_retriever
-
-
-@lru_cache(maxsize=1)
-def build_chain():
-    # Nhánh sinh câu trả lời: dict{docs, question} -> prompt -> model -> str
-    generate = (
-        RunnableLambda(
-            lambda x: {"context": format_docs(x["docs"]), "question": x["question"]}
-        )
-        | RAG_PROMPT
-        | get_llm()
-        | StrOutputParser()
-    )
-    # Chain đầy đủ: giữ lại docs để trả sources, thêm key "answer"
-    return (
-        RunnableParallel(docs=get_retriever(), question=RunnablePassthrough())
-        | RunnablePassthrough.assign(answer=generate)
-    )
-
-
-def answer_question(question: str) -> dict:
-    out = build_chain().invoke(question)
-    return {
-        "answer": out["answer"],
-        "sources": [
-            {"n": i, "source": d.metadata["source"], "title": d.metadata.get("title")}
-            for i, d in enumerate(out["docs"], start=1)
-        ],
-    }
-```
-
-Đọc chain từ trên xuống: `RunnableParallel` nhận string câu hỏi, chạy song song hai nhánh
-(retriever lấy docs, passthrough giữ nguyên câu hỏi) và cho ra dict `{docs, question}`.
-`assign(answer=generate)` giữ nguyên dict đó và thêm key `answer` bằng cách chạy nhánh
-`generate`. Vì `docs` còn trong dict, `answer_question` trả được cả nguồn mà không retrieve
-lần hai. Muốn stream câu trả lời ra UI, thay `.invoke` bằng `.stream` trên nhánh `generate`;
-LCEL đã lo phần còn lại.
-
-### cli.py và api/main.py
-
-```python
-# src/docs_rag/cli.py
-import argparse
-import json
-
-from docs_rag.generation.chain import answer_question
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(prog="docs-rag")
-    sub = parser.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("ask").add_argument("question")
-    args = parser.parse_args()
-    print(json.dumps(answer_question(args.question), indent=2, ensure_ascii=False))
-
-
-if __name__ == "__main__":
-    main()
-```
-
-```python
-# src/docs_rag/api/main.py
-from fastapi import FastAPI
-from pydantic import BaseModel
-
-from docs_rag.generation.chain import answer_question
-
-app = FastAPI(title="docs-rag")
-
-
-class AskRequest(BaseModel):
-    question: str
-
-
-@app.post("/ask")
-def ask(req: AskRequest) -> dict:
-    return answer_question(req.question)
-```
-
-Cả hai entrypoint chỉ gọi một hàm. Logic RAG không biết nó đang được gọi từ terminal hay
-HTTP, nên test chain không cần dựng server.
-
-### Chạy thử
-
-```bash
-cp .env.example .env                       # giữ mặc định Ollama
-cp -r ~/team-docs/*.md data/raw/
-uv run python scripts/ingest.py            # 42 documents -> 388 chunks -> storage/chroma
-uv run python -m docs_rag.cli ask "How do we rotate the production API keys?"
-uv run uvicorn docs_rag.api.main:app --reload
-curl -X POST localhost:8000/ask -H 'content-type: application/json' \
-     -d '{"question": "How do we rotate the production API keys?"}'
-```
-
-Kết quả dạng:
-
-```json
-{
-  "answer": "Rotate keys in the admin console, then redeploy the gateway [1][3].",
-  "sources": [
-    {"n": 1, "source": "runbooks/api-keys.md", "title": "API key rotation"},
-    {"n": 2, "source": "onboarding/access.md", "title": "Getting access"},
-    {"n": 3, "source": "runbooks/gateway.md", "title": "Gateway deploys"}
-  ]
-}
-```
-
-Nguồn `[2]` được retrieve nhưng model không dùng; đó là tín hiệu bình thường và chính là thứ
-bạn sẽ đo ở bước eval (bao nhiêu chunk lấy về thực sự hữu ích).
-
-### Một câu hỏi đi qua các file thế nào
+### Luồng online: một câu hỏi đi qua các file thế nào
 
 ![Luồng một câu hỏi qua cây thư mục docs-rag: scripts/ingest.py chạy offline qua loaders, chunking, embeddings, vectorstore; online thì api/main.py gọi generation/chain.py, chain gọi retrieval/retriever.py và indexing/vectorstore.py, rồi prompts.py và llm.py, trả về answer và sources](blog/langchain-rag-from-scratch-flow.svg)
 
-1. `POST /ask` đến `api/main.py`; Pydantic validate body và gọi `answer_question`.
-2. `generation/chain.py` đưa câu hỏi thô vào `RunnableParallel`; nhánh `docs` gọi retriever.
-3. `retrieval/retriever.py` hỏi Chroma trong `indexing/vectorstore.py`; Chroma gọi `embed_query` của `indexing/embeddings.py` để biến câu hỏi thành vector.
+1. Request `POST /ask` với một câu hỏi đến `api/main.py`; Pydantic validate body và gọi hàm trả lời trong `chain.py`.
+2. `generation/chain.py` đưa câu hỏi thô vào bước song song; nhánh docs gọi retriever.
+3. `retrieval/retriever.py` hỏi Chroma trong `indexing/vectorstore.py`; Chroma gọi `embed_query` của `indexing/embeddings.py` để biến câu hỏi thành vector, rồi tìm k vector gần nhất.
 4. Bốn chunk gần nhất quay về dưới dạng `Document`, mang `source` và `title` từ loader.
-5. `format_docs` đánh số `[1]`..`[4]`; `generation/prompts.py` điền `{context}` và `{question}` thành hai message.
-6. `generation/llm.py` gửi message đến chat model; `StrOutputParser` lấy text từ `AIMessage`.
-7. `chain.py` trả `{answer, sources}`; `main.py` serialize thành JSON.
+5. Hàm đánh số trong `retriever.py` biến chúng thành khối text `[1]`..`[4]`; `generation/prompts.py` điền `{context}` và `{question}` thành hai message.
+6. `generation/llm.py` gửi hai message đến chat model; `StrOutputParser` lấy text từ `AIMessage`.
+7. `chain.py` trả answer kèm sources; `main.py` serialize thành JSON.
+
+Với câu hỏi "How do we rotate the production API keys?", kết quả trông thế này: answer là
+một hai câu, mỗi câu kết thúc bằng `[1]` hoặc `[1][3]`; sources là ba mục, mỗi mục có số thứ
+tự, tên file (ví dụ `runbooks/api-keys.md`) và title. Nguồn `[2]` được retrieve nhưng model
+không dùng; đó là tín hiệu bình thường và chính là thứ bạn sẽ đo ở bước eval (bao nhiêu chunk
+lấy về thực sự hữu ích).
 
 Mỗi bước là một file, và mỗi file là một component trong bảng ở phần 2. Khi câu trả lời sai,
 bạn biết mở file nào: nguồn lấy sai thì nhìn `retrieval/` và `ingestion/chunking.py`; nguồn
 đúng mà trả lời sai thì nhìn `generation/prompts.py` và model.
 
-### Test với component giả
+### Chạy, test và mở rộng, bằng lời
 
-`langchain-core` có sẵn model giả để test chain mà không cần Ollama hay API key:
-`DeterministicFakeEmbedding` (vector giả nhưng ổn định theo text) và `FakeListChatModel`
-(trả lần lượt các câu đã định). Vì `get_llm` và `get_embeddings` là hàm module, test chỉ cần
-monkeypatch chúng.
+Để chạy, bạn cần bốn việc: cài các package trong `pyproject.toml` (langchain, langchain-ollama,
+langchain-chroma, langchain-text-splitters, fastapi); kéo hai model Ollama là `llama3.1` và
+`nomic-embed-text`; chép tài liệu vào `data/raw`; chạy script ingest. Sau đó hỏi qua CLI, hoặc
+khởi động FastAPI và gửi `POST /ask` với body có một trường `question`.
 
-```python
-# tests/test_chain.py
-from langchain_core.embeddings import DeterministicFakeEmbedding
-from langchain_core.language_models.fake_chat_models import FakeListChatModel
+Để test mà không cần Ollama hay API key, `langchain-core` có sẵn hai component giả:
+`DeterministicFakeEmbedding` (vector giả nhưng ổn định theo text) và `FakeListChatModel` (trả
+lần lượt các câu đã định). `test_chain.py` thay hai hàm tạo model trong `embeddings.py` và
+`llm.py` bằng chúng, ingest hai file nhỏ vào thư mục tạm, hỏi một câu, và kiểm tra ba điều:
+answer có chứa `[1]`, sources có đúng tên file, và metadata không rơi mất trên đường đi. Test
+chạy dưới một giây và bắt được các lỗi hay gặp nhất.
 
-
-def test_answer_carries_sources(monkeypatch, tmp_path):
-    monkeypatch.setattr("docs_rag.indexing.embeddings.get_embeddings",
-        lambda: DeterministicFakeEmbedding(size=64))
-    monkeypatch.setattr("docs_rag.generation.llm.get_llm",
-        lambda: FakeListChatModel(responses=["Rotate in the console [1]."]))
-    # ... ingest 2 file nhỏ vào tmp_path, rồi:
-    from docs_rag.generation.chain import answer_question
-    out = answer_question("how to rotate keys")
-    assert "[1]" in out["answer"] and out["sources"][0]["source"].endswith(".md")
-```
-
-Test này chạy dưới một giây và bắt được các lỗi hay gặp nhất: metadata rơi mất trên đường
-đi, `format_docs` đánh số lệch, chain trả thiếu key.
+Để mở rộng, bạn sửa đúng một file cho mỗi thay đổi: đổi hãng model thì sửa `.env`; đổi vector
+store thì sửa `vectorstore.py`; thêm PDF thì sửa `loaders.py`; đổi cách cắt thì sửa
+`chunking.py` rồi chạy lại ingest; thêm quy tắc trả lời thì sửa `prompts.py`. Thư mục `eval`
+giữ bộ câu hỏi vàng để mỗi lần sửa bạn biết mình làm tốt lên hay tệ đi; [bài 3](#/blog/rag-production-techniques)
+nói kỹ cách đo này.
 
 ### Biến thể agent: cùng retriever, thêm vòng lặp
 
 Khi bạn thực sự cần agentic RAG (câu hỏi đòi tìm nhiều lần), thay đổi nằm ngoài các thư mục
-đã có: bọc retriever thành tool và đưa vào `create_agent`. Mọi thứ trong `ingestion`,
+đã có: thêm một file `agent.py` bọc retriever thành tool và đưa vào `create_agent`. Tool đó,
+gọi là `search_docs`, chỉ là một hàm nhận `query` dạng string, gọi retriever, và trả về khối
+text đã đánh số; docstring của nó nói với model "tìm trong tài liệu nội bộ, trả về các đoạn
+kèm nguồn". `create_agent` nhận tên model từ Settings (phải là model hỗ trợ tool calling),
+list tool có một phần tử, một `system_prompt` yêu cầu chỉ trả lời từ kết quả tìm và trích
+dẫn `[n]`, và một checkpointer để nhớ lịch sử theo `thread_id`. Mọi thứ trong `ingestion`,
 `indexing`, `retrieval` dùng lại nguyên vẹn.
 
-```python
-# src/docs_rag/agent.py  (tuỳ chọn)
-from langchain.agents import create_agent
-from langchain.tools import tool
-from langgraph.checkpoint.memory import InMemorySaver
-
-from docs_rag.config import settings
-from docs_rag.retrieval.retriever import format_docs, get_retriever
-
-
-@tool
-def search_docs(query: str) -> str:
-    """Search the team's internal docs. Returns numbered passages with sources."""
-    return format_docs(get_retriever().invoke(query))
-
-
-agent = create_agent(
-    model=settings.chat_model,          # cần model hỗ trợ tool calling
-    tools=[search_docs],
-    system_prompt="Answer only from search_docs. Cite [n]. Search again if needed.",
-    checkpointer=InMemorySaver(),       # lịch sử theo thread_id
-)
-
-question = "Compare key rotation for prod and staging."
-result = agent.invoke(
-    {"messages": [{"role": "user", "content": question}]},
-    {"configurable": {"thread_id": "demo"}},
-)
-print(result["messages"][-1].content)
-```
-
-Model có thể gọi `search_docs` hai lần với hai query khác nhau rồi tổng hợp. Cái giá: số lần
-gọi model không còn cố định, và bạn phải đọc trace để biết nó đã tìm gì. Hãy để `agent.py`
-nằm cạnh `chain.py` như một lựa chọn, không thay thế.
+Với câu hỏi "so sánh cách xoay key giữa prod và staging", model có thể gọi `search_docs` hai
+lần với hai query khác nhau rồi tổng hợp. Cái giá: số lần gọi model không còn cố định, và bạn
+phải đọc trace để biết nó đã tìm gì. Hãy để `agent.py` nằm cạnh `chain.py` như một lựa chọn,
+không thay thế.
 
 ### Khi nào không nên dùng LangChain
 

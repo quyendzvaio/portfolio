@@ -259,8 +259,8 @@ nào*, và *khi nào được gọi là xong*.
 
 ### Cây thư mục: nhìn là thấy đâu là agent, đâu là harness
 
-Mã dưới đây dùng Anthropic Python SDK 2.x (gọi thẳng Messages API, tự viết vòng lặp để mọi thành
-phần harness lộ ra) và MCP Python SDK 2.x cho phần tool. Nếu bạn dùng LangGraph như [bài 4](#/blog/langgraph-ai-agents), mỗi ô
+Thiết kế dưới đây giả định gọi thẳng API của model qua SDK chính thức và tự viết vòng lặp, để mọi
+thành phần harness lộ ra thay vì ẩn trong framework; phần tool có thể bọc MCP. Nếu bạn dùng LangGraph như [bài 4](#/blog/langgraph-ai-agents), mỗi ô
 trong sơ đồ thành một node và state của graph thay cho `progress.json`; các thành phần harness vẫn
 y nguyên, chỉ đổi chỗ đứng.
 
@@ -276,10 +276,10 @@ research-agent/
 │   │   └── compaction.md     # prompt tóm tắt lịch sử: giữ gì, bỏ gì
 │   └── report_schema.py      # cấu trúc báo cáo: đoạn + [n] + danh sách nguồn
 ├── tools/                    # những gì agent có thể làm (bọc MCP được)
-│   ├── registry.py           # ToolSpec: tên, mô tả, schema, hàm, cờ read_only/network
+│   ├── registry.py           # danh bạ tool: tên, mô tả, schema, hàm, cờ chỉ-đọc/mạng
 │   ├── search.py             # tìm web: lọc domain, trả title+url+snippet gọn
 │   ├── fetch.py              # tải trang -> text sạch, cắt theo giới hạn, lưu bản gốc
-│   ├── notes.py              # ghi chú có cấu trúc: claim, quote, url
+│   ├── notes.py              # ghi và đọc lại ghi chú có cấu trúc: claim, quote, url
 │   ├── submit_report.py      # nộp báo cáo: chạy verifier, trả lỗi để model sửa
 │   └── mcp_server.py         # bày các tool trên qua MCP cho agent khác dùng lại
 ├── harness/                  # những gì quản vòng lặp, không phụ thuộc model
@@ -334,13 +334,13 @@ việc theo thứ tự: trước hết xoá nội dung các `tool_result` cũ (g
 cách nén nhẹ tay và an toàn nhất; đo lại, nếu vẫn dài thì gọi model với `compaction.md` để tóm tắt
 phần lịch sử cũ thành một đoạn, giữ đúng những gì prompt yêu cầu: kế hoạch, câu hỏi con đã đóng,
 nguồn đã đọc và chưa đọc, nghi vấn chưa giải quyết. Lịch sử mới gồm bản tóm tắt cộng vài lượt gần
-nhất. Agent không hoảng vì mất chi tiết: chi tiết nằm trong `notes.md`, nó có thể gọi `read_notes`.
+nhất. Agent không hoảng vì mất chi tiết: chi tiết nằm trong `notes.md`, nó có thể gọi tool ghi chú để đọc lại.
 
 Bước 20, model thấy ba câu hỏi con đều có ít nhất hai nguồn và viết bản nháp, rồi gọi
 `submit_report`. Đây là chỗ harness tỏ rõ ý đồ: nộp báo cáo *là một tool*, và tool đó chạy
 `verifiers/`. `citations.py` thấy đoạn ba có một con số không kèm `[n]`, và `[4]` trỏ tới một URL
-có trong kết quả search nhưng chưa từng được `fetch`. Tool trả về `is_error: true` với hai dòng
-lỗi nói đích danh đoạn nào, URL nào, và cách sửa ("fetch URL rồi ghi chú, hoặc bỏ claim"). Model
+có trong kết quả search nhưng chưa từng được `fetch`. Tool trả về một kết quả lỗi với hai dòng
+nói đích danh đoạn nào, URL nào, và cách sửa ("fetch URL rồi ghi chú, hoặc bỏ claim"). Model
 fetch trang đó, ghi chú, sửa bản nháp, nộp lại ở bước 23. Verifier qua, `report.md` được ghi,
 `progress.json` chuyển `done: true`, vòng lặp dừng.
 
@@ -351,259 +351,65 @@ bước 23 chứ không phải bước 0. Suốt quá trình, `trace.jsonl` có 
 call; `run_evals.py` chạy lại câu hỏi này cùng 29 câu khác ba lần mỗi câu và báo pass^3, con số
 cho biết hệ thống *ổn định* đến đâu chứ không chỉ "có lúc đúng".
 
-### Mã khung của bốn mảnh quan trọng
+### Bốn mảnh quyết định độ tin cậy
 
-**Vòng lặp.** Mọi quyết định của harness nằm ở các dòng không gọi model: cổng quyền trước tool,
-nén trước khi gọi, ghi state sau mỗi bước, và điều kiện dừng không thuộc quyền model.
+Không cần đọc code để hiểu harness này. Chỉ cần biết từng mảnh làm gì, nằm ở đâu trong cây thư mục,
+và vì sao thiếu nó thì hệ thống trôi.
 
-```python
-# agent/loop.py  (Anthropic Python SDK 2.x)
-import anthropic
-from harness import budget, context, policy, state, tracing
-from tools.registry import REGISTRY
+| Mảnh | Nằm ở | Làm gì | Vì sao phải có |
+|---|---|---|---|
+| Vòng lặp | agent/loop.py | gọi model, chạy tool, ghi state, quyết định dừng | model không được tự tuyên bố xong |
+| Cổng quyền | harness/policy.py | duyệt từng lời gọi tool trước khi chạy | chặn domain lạ, tool cấm, gọi quá tay |
+| Verifier | harness/verifiers/ | soát báo cáo bằng code thuần | model tự chấm thì luôn thấy mình đúng |
+| Nén context | harness/context.py | dọn kết quả cũ, rồi tóm tắt | việc dài vượt quá một context window |
 
-def run(question: str, cfg: dict, run_id: str) -> state.Progress:
-    client = anthropic.Anthropic()
-    prog = state.load_or_create(run_id, question)      # progress.json + notes.md
-    messages = state.load_messages(run_id) or [
-        {"role": "user", "content": question}]
-    tracer = tracing.Tracer(run_id)
+**Vòng lặp.** Mỗi vòng làm đúng một chuỗi việc: kiểm ngân sách (số bước, số token) và dừng nếu cạn;
+nén context nếu đã vượt ngưỡng; gọi model với system prompt, bản rút gọn của `progress.json` và danh
+sách tool; nếu model gọi tool thì từng lời gọi đi qua cổng quyền rồi mới chạy, kết quả (kể cả lỗi,
+kèm lý do) được trả lại cho model; cuối vòng ghi `progress.json` để phiên sau tiếp tục được. Hai quyết
+định thiết kế nằm ở đây. Thứ nhất, model ngừng nói không có nghĩa là xong: "xong" chỉ có một đường
+là `submit_report` chạy qua verifier; nếu model dừng mà chưa nộp, vòng lặp nhắc nó tiếp tục. Đây là
+*pass-state gating* của khoá học áp vào báo cáo thay vì feature. Thứ hai, tool bị từ chối vẫn nhận
+được câu trả lời có lý do, để model đổi hướng thay vì bị lặng lẽ bỏ qua. Khi ngân sách cạn, vòng lặp
+không cố nộp một báo cáo chưa kiểm; nó ghi bàn giao và thoát.
 
-    while not prog.done:
-        # Điều kiện dừng thuộc harness, không thuộc model.
-        if budget.exhausted(prog, cfg):
-            state.write_handoff(prog, reason="budget")
-            break
-        # Nén context trước khi gọi model, chỉ khi vượt ngưỡng.
-        messages = context.maybe_compact(client, messages, prog, cfg)
+**Tool và mô tả tool.** Mô tả tool là một prompt: nó nói cho model khi nào dùng tool, tham số nghĩa
+là gì, kết quả trông thế nào, và cảnh báo quan trọng nhất của hệ này: kết quả tìm kiếm chỉ là ứng
+viên, phải fetch trước khi được trích dẫn. Thân tool lo chuyện tiết kiệm context: lọc theo allow-list
+domain, chỉ trả tiêu đề, URL và một đoạn trích, và ghi các URL đã thấy vào state để verifier đối
+chiếu. Mỗi tool mang hai cờ, *chỉ đọc* và *có dùng mạng*, để cổng quyền xét duyệt mà không cần biết
+từng tool; đó là cùng ý tưởng với annotation của MCP ở
+[bài 5](#/blog/mcp-model-context-protocol). Muốn agent khác dùng lại bộ tool này, `tools/mcp_server.py`
+chỉ bày đúng các hàm đó qua MCP, không viết lại logic.
 
-        resp = client.messages.create(
-            model=cfg["model"],
-            max_tokens=16000,
-            system=state.render_system(prog),          # system.md + state rút gọn
-            tools=REGISTRY.schemas(),
-            messages=messages,
-        )
-        tracer.model_call(prog.step, resp.usage, resp.stop_reason)
-        budget.record(prog, resp.usage)
+**Verifier trích dẫn.** Verifier là code thuần, không gọi model, nên nó không "tự thuyết phục" rằng
+lỗi không quan trọng, điều Anthropic quan sát được ở evaluator bằng LLM khi chưa tinh chỉnh. Nó làm
+ba kiểm tra: đoạn nào nêu số liệu phải có một dấu trích dẫn; mỗi dấu trích dẫn phải có trong danh
+sách nguồn cuối báo cáo; và URL của nguồn phải nằm trong danh sách URL *đã fetch* do harness ghi khi
+tool `fetch` chạy, không phải do model khai. Một URL chỉ xuất hiện trong kết quả tìm kiếm chưa đủ để
+được trích dẫn. Mỗi lỗi trả về kèm cách sửa ("fetch URL rồi ghi chú, hoặc bỏ claim"). Đây là cách
+chặn lỗi "bịa nguồn" bằng cấu trúc, không bằng lời dặn trong prompt.
 
-        if resp.stop_reason == "end_turn":
-            # Model dừng mà chưa submit_report: nhắc lại, không chấp nhận văn bản trần.
-            messages.append({"role": "assistant", "content": resp.content})
-            messages.append({"role": "user", "content":
-                "Chưa có báo cáo nào được nộp qua submit_report. Tiếp tục."})
-            prog.step += 1
-            continue
-        if resp.stop_reason == "pause_turn":           # server-tool tạm dừng, gửi lại
-            messages.append({"role": "assistant", "content": resp.content})
-            continue
-
-        messages.append({"role": "assistant", "content": resp.content})
-        results = []
-        for call in (b for b in resp.content if b.type == "tool_use"):
-            verdict = policy.check(call.name, call.input, prog, cfg)
-            if not verdict.allowed:                    # cổng quyền: từ chối có lý do
-                out = f"Bị từ chối: {verdict.reason}"
-                is_error = True
-            else:
-                out, is_error = REGISTRY.run(call.name, call.input, prog)
-            tracer.tool_call(prog.step, call.name, call.input, is_error)
-            results.append({"type": "tool_result", "tool_use_id": call.id,
-                            "content": out, "is_error": is_error})
-        messages.append({"role": "user", "content": results})
-
-        prog.step += 1
-        state.save(prog, messages)                     # phiên sau resume từ đây
-    return prog
-```
-
-Hai chi tiết đáng chú ý. Thứ nhất, `end_turn` không phải "xong": xong chỉ có một đường là
-`submit_report` chạy qua verifier và lật `prog.done`. Đây là *pass-state gating* của khoá học áp
-vào báo cáo thay vì feature. Thứ hai, tool bị từ chối vẫn trả `tool_result` với `is_error`, để model
-biết vì sao và đổi hướng, thay vì lặng lẽ bị bỏ qua.
-
-**Một tool.** Mô tả tool là một prompt. Nó nói cho model khi nào dùng, tham số nghĩa là gì, và kết
-quả trông thế nào. Phần thân tool lo chuyện tiết kiệm context.
-
-```python
-# tools/search.py
-from tools.registry import ToolSpec
-
-def search(query: str, max_results: int = 8, *, prog, cfg) -> tuple[str, bool]:
-    allowed = cfg["permissions"]["allowed_domains"]
-    hits = [h for h in cfg["search_backend"](query, max_results * 2)
-            if any(h.domain.endswith(d) for d in allowed)][:max_results]
-    if not hits:
-        return ("Không có kết quả trong các domain được phép. "
-                "Thử từ khoá khác hoặc cụ thể hơn.", True)
-    # Chỉ trả tín hiệu cao: tiêu đề, URL, một đoạn trích. Không HTML, không id.
-    lines = [f"- {h.title}\n  {h.url}\n  {h.snippet[:200]}" for h in hits]
-    prog.seen_urls.update(h.url for h in hits)        # verifier dùng để đối chiếu
-    return "\n".join(lines), False
-
-SEARCH = ToolSpec(
-    name="search",
-    description=(
-        "Tìm trên web trong các domain nguồn được phép (blog kỹ thuật của vendor, "
-        "repo, paper). Dùng khi cần tìm NGUỒN cho một câu hỏi con; mỗi lần một ý. "
-        "Kết quả chỉ là ứng viên: phải fetch trước khi trích dẫn."
-    ),
-    input_schema={
-        "type": "object",
-        "properties": {
-            "query": {"type": "string",
-                      "description": "Câu truy vấn ngắn, 3-8 từ khoá, tiếng Anh"},
-            "max_results": {"type": "integer", "minimum": 1, "maximum": 10,
-                            "description": "Mặc định 8; tăng khi recall thấp"},
-        },
-        "required": ["query"],
-        "additionalProperties": False,
-    },
-    fn=search,
-    read_only=True,
-    network=True,
-)
-```
-
-`ToolSpec` giữ hai cờ `read_only` và `network` để `policy.py` quyết định mà không cần biết từng
-tool; đó cũng là ý tưởng *annotation* của MCP mà [bài 5](#/blog/mcp-model-context-protocol) đã nhắc. Nếu muốn một agent khác dùng lại
-bộ tool này, `tools/mcp_server.py` chỉ cần bọc chúng:
-
-```python
-# tools/mcp_server.py  (MCP Python SDK 2.x)
-from mcp.server import MCPServer
-from tools import search as s
-
-mcp = MCPServer("research-tools")
-
-@mcp.tool()
-def search(query: str, max_results: int = 8) -> str:
-    """Tìm nguồn trong các domain được phép. Trả title, url, snippet."""
-    text, _ = s.search(query, max_results, prog=..., cfg=...)
-    return text
-```
-
-**Một verifier.** Verifier là code thuần, không gọi model, nên nó không "tự thuyết phục" rằng lỗi
-không quan trọng, điều Anthropic quan sát được ở evaluator bằng LLM khi chưa được tinh chỉnh. Lỗi
-trả về phải nói cách sửa.
-
-```python
-# harness/verifiers/citations.py
-import re
-CITE = re.compile(r"\[(\d+)\]")
-
-def check_citations(report: str, prog) -> list[str]:
-    """Trả về danh sách lỗi; rỗng nghĩa là qua."""
-    body, _, sources = report.partition("\n## Sources\n")
-    src = dict(re.findall(r"^\[(\d+)\]\s+(\S+)", sources, flags=re.M))
-    errors = []
-
-    for i, para in enumerate(p for p in body.split("\n\n") if p.strip()):
-        if para.startswith("#"):
-            continue
-        has_number = re.search(r"\d", para) is not None
-        if has_number and not CITE.search(para):
-            errors.append(
-                f"Đoạn {i + 1} nêu số liệu nhưng không có [n]. "
-                "Thêm trích dẫn tới một nguồn đã fetch, hoặc bỏ số liệu.")
-
-    for n in set(CITE.findall(body)):
-        url = src.get(n)
-        if url is None:
-            errors.append(f"[{n}] được dùng nhưng không có trong ## Sources.")
-        elif url not in prog.fetched_urls:
-            errors.append(
-                f"[{n}] trỏ tới {url} nhưng URL này chưa được fetch. "
-                "Gọi fetch rồi write_note trước khi trích dẫn.")
-    return errors
-```
-
-Điểm mấu chốt là `prog.fetched_urls`: đó là sự thật do harness ghi khi `fetch` chạy, không phải do
-model khai. Một URL chỉ xuất hiện trong kết quả search (`seen_urls`) chưa đủ để được trích dẫn.
-Đây là cách chặn lỗi "bịa nguồn" bằng cấu trúc, không bằng lời dặn trong prompt.
-
-**Bước nén context.** Hai tầng, từ nhẹ đến nặng, và luôn ưu tiên tầng nhẹ.
-
-```python
-# harness/context.py
-from harness import budget
-
-def maybe_compact(client, messages, prog, cfg):
-    trig = cfg["compaction"]["trigger_tokens"]
-    if budget.estimate_tokens(messages) < trig:
-        return messages
-
-    # Tầng 1: xoá nội dung tool_result cũ, giữ N kết quả gần nhất. Không mất quyết định.
-    keep = cfg["compaction"]["keep_recent_tool_results"]
-    seen = 0
-    for msg in reversed(messages):
-        if msg["role"] != "user" or not isinstance(msg["content"], list):
-            continue
-        for block in msg["content"]:
-            if block.get("type") == "tool_result":
-                seen += 1
-                if seen > keep:
-                    block["content"] = "[đã xoá khi nén; chi tiết trong notes.md]"
-    if budget.estimate_tokens(messages) < trig:
-        return messages
-
-    # Tầng 2: tóm tắt phần cũ bằng model, theo prompt compaction.md.
-    old, recent = messages[:-6], messages[-6:]
-    summary = client.messages.create(
-        model=cfg["model"], max_tokens=4000,
-        system=open("agent/prompts/compaction.md").read(),
-        messages=old + [{"role": "user", "content":
-            "Tóm tắt lịch sử trên để một phiên mới tiếp tục được việc."}],
-    )
-    text = next(b.text for b in summary.content if b.type == "text")
-    prog.compactions += 1
-    return [{"role": "user", "content":
-             f"[Tóm tắt lịch sử sau {prog.compactions} lần nén]\n{text}"}] + recent
-```
-
-`compaction.md` nói rõ giữ gì: kế hoạch và tình trạng từng câu hỏi con, URL đã đọc và chưa đọc,
-nghi vấn còn mở, quyết định đã chốt; bỏ gì: nội dung trang đã ghi chú, các lần tìm không ra. Nếu
-dùng Claude API, bạn có thể thay tầng 1 bằng tính năng context editing và tầng 2 bằng compaction
-phía server (cả hai đang ở trạng thái beta); hiểu được phiên bản tự viết thì bạn biết mình đang
-bật cái gì. Lưu ý thêm: với các model mới nhất, sửa lịch sử đã gửi có thể làm mất hiệu lực các
-block suy luận trước đó, nên hãy kiểm tra tài liệu model trước khi tự nén theo cách ghi đè.
+**Nén context.** Hai tầng, từ nhẹ đến nặng, luôn thử tầng nhẹ trước. Tầng một xoá nội dung các kết
+quả tool cũ, giữ sáu kết quả gần nhất; không mất quyết định nào, vì quyết định nằm trong lời của
+model, không nằm trong kết quả tool. Nếu vẫn dài, tầng hai gọi model với `compaction.md` để tóm tắt
+phần lịch sử cũ thành một đoạn, giữ: kế hoạch và tình trạng từng câu hỏi con, URL đã đọc và chưa đọc,
+nghi vấn còn mở, quyết định đã chốt; bỏ: nội dung trang đã ghi chú, các lần tìm không ra. Lịch sử
+mới gồm bản tóm tắt cộng vài lượt gần nhất; chi tiết luôn còn trong `notes.md`. Nếu dùng Claude API,
+bạn có thể thay tầng một bằng tính năng context editing và tầng hai bằng compaction phía server (cả
+hai đang ở trạng thái beta); hiểu phiên bản tự thiết kế thì bạn biết mình đang bật cái gì. Lưu ý: với
+các model mới nhất, sửa lịch sử đã gửi có thể làm mất hiệu lực các block suy luận trước đó, nên hãy
+đọc tài liệu model trước khi tự nén theo cách ghi đè.
 
 **Cấu hình và bằng chứng.** `config.yaml` là nơi mọi "giả định về điều model chưa làm được" nằm
-thành số, để bỏ bớt khi model mạnh lên:
-
-```yaml
-model: claude-opus-5-5
-limits:
-  max_steps: 40
-  token_budget: 400000
-compaction:
-  trigger_tokens: 120000
-  keep_recent_tool_results: 6
-permissions:
-  allowed_domains: [anthropic.com, langchain.com, github.com, arxiv.org]
-  fetch_max_bytes: 200000
-  fetch_timeout_s: 15
-verifiers:
-  min_sources: 3
-  require_citation_for_numbers: true
-```
-
-Và `evals/tasks.jsonl`, mỗi dòng một task với tiêu chí chấm bằng code (in dãn dòng ở đây
-cho dễ đọc; trong file mỗi task nằm trên một dòng):
-
-```json
-{
-  "id": "harness-evidence",
-  "question": "Evidence that changing the harness, not the model, changes agent results?",
-  "must_cite_domains": ["anthropic.com"],
-  "min_sources": 3,
-  "forbidden": ["uncited_number"]
-}
-```
-
-`run_evals.py` chạy mỗi task k lần, chấm *outcome* (file `report.md` có qua grader không) chứ không
-chấm đường đi, và báo cả pass@k lẫn pass^k. Với agent nghiên cứu mà người dùng tin kết quả, pass^k
-là con số đáng nhìn: 75% mỗi lần nghe ổn, nhưng xác suất ba lần liền đều ổn chỉ khoảng 42%.
+thành con số, để nới ra khi model mạnh lên: model nào; tối đa 40 bước và 400 nghìn token; nén khi
+vượt 120 nghìn token, giữ 6 kết quả tool gần nhất; allow-list domain, 200 KB và 15 giây mỗi trang;
+tối thiểu 3 nguồn và mọi số liệu phải có trích dẫn. `evals/tasks.jsonl` có một dòng cho mỗi task,
+gồm câu hỏi, các domain bắt buộc phải được trích, số nguồn tối thiểu, và các lỗi bị cấm (ví dụ số
+liệu không có nguồn). `run_evals.py` chạy mỗi task k lần, chấm *outcome* (báo cáo cuối có qua grader
+không) chứ không chấm đường đi, và báo cả pass@k lẫn pass^k. Với agent nghiên cứu mà người dùng tin
+kết quả, pass^k là con số đáng nhìn: 75% mỗi lần nghe ổn, nhưng xác suất ba lần liền đều ổn chỉ
+khoảng 42%.
 
 ## Khi nào không cần harness đầy đủ
 
