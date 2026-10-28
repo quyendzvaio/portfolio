@@ -92,7 +92,7 @@
 
   <rect x="504" y="580" width="196" height="80" rx="12" fill="#11142a" stroke="#f0b429" stroke-width="1.5"/>
   <text x="602" y="612" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">State</text>
-  <text x="602" y="638" text-anchor="middle" font-size="15" fill="#9ba3c4">progress.json · notes</text>
+  <text x="602" y="638" text-anchor="middle" font-size="15" fill="#9ba3c4">PROGRESS.md · notes</text>
 
   <rect x="724" y="580" width="196" height="80" rx="12" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
   <text x="822" y="612" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Tracing &amp; budget</text>

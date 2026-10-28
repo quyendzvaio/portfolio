@@ -37,56 +37,53 @@ model last.
 
 ## Agent = LLM + harness
 
-Put plainly: the model is the brain. It reads, thinks, and decides the next step. But a brain on its
-own does not finish a long job. It needs a description of the work, a desk with tools, a notebook of
-what has been done, a few rules about what is and is not allowed, and someone who checks the result
-before it may say "done". All of that "around the brain" is the harness. An agent is the brain plus
-everything around it.
+The course opens lecture 02 with a picture, and I will borrow it because it gets to the heart of the
+matter. Imagine you are a newly hired engineer dropped into a project with zero documentation. No
+README, no comments in the code, nobody tells you how to run the tests, the CI config is buried
+somewhere. Can you write good code? Maybe, if you are smart enough and patient enough. But you will
+spend most of your time "figuring out what this project is about" instead of solving the problem. An
+agent is in exactly that spot, and worse off: you can at least ask the colleague next to you; the
+agent sees only the files you put in front of it and can only run the commands you allow.
 
-Picture this. You hire a brilliant engineer. On day one you say "add search" and walk into a
-meeting. No documentation, nobody tells them how to run the tests, nobody explains the team's
-conventions, nobody reviews. They are still brilliant, but they will guess the requirement wrong,
-pick the wrong library, and confidently report done because nothing lets them check. The same person
-with a clear brief, a machine that is already set up, a checklist of what "done" means, just enough
-access, and an independent reviewer ships something usable. The person did not change; everything
-around the person did. An agent is exactly the same, only worse off: a new hire can at least ask a
-colleague, while the agent sees only the files you put in front of it and the commands you let it
-run. The course uses exactly this image in
-[lecture 02](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-02-what-a-harness-actually-is/index.md).
+From there the course's definition is short: a harness is *everything outside the model weights*.
+The weights are the trained "brain", which you cannot edit. Everything else you build around it, from
+the instruction sheet, the toolbox and the workplace to the progress notebook and the way results are
+checked, is harness. Put bluntly: if it is not model weights, it is harness. With it comes a principle
+that sounds odd but matters a lot: *the repository is the single source of truth*. Anything the agent
+cannot see in the repo does not exist for it. A convention that lives in your head or in a Slack
+message from three months ago is, to the agent, not there.
 
-So what does the harness do for the agent? It lets the brain work on a long job without drifting:
-it knows where it is after its short-term memory fills up, it does not repeat a mistake it already
-made, it does not quietly widen the job, it does not do what is forbidden, and it may not say "done"
-until there is proof. The harness does not make the model one bit smarter. It makes that
-intelligence produce results you can trust.
+So what does the harness do for the agent? It lets the brain work on a long job without drifting: it
+knows where it is after its short-term memory fills up, it does not repeat a mistake it already made,
+it does not quietly widen the job, it does not do what is forbidden, and it may not say "done" until
+there is proof. The harness does not make the model one bit smarter. The course puts it plainly: *the
+model decides what code to write; the harness governs when, where and how it writes it*. It does not
+make the model better; it makes the model's output reliable.
 
 ### Where the formula comes from
 
-The formula is short enough to pass for a slogan, so let us be precise about its source. The term
-*harness engineering* was used by Mitchell Hashimoto in
+The formula is short enough to pass for a slogan, so let us be precise about its source. The
+[learn-harness-engineering](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-02-what-a-harness-actually-is/index.md) course names its own two main references: OpenAI's harness
+engineering article and Anthropic's articles on harnesses for long-running agents. The term *harness
+engineering* was used by Mitchell Hashimoto in
 [My AI adoption journey](https://mitchellh.com/writing/my-ai-adoption-journey) (February 2026) with
-a very practical definition: whenever an agent makes a mistake, you take the time to engineer a
-fix so it *never* makes that mistake again, through instructions in `AGENTS.md` or through real
-tools. The equation "Agent = Model + Harness" was written down by Vivek Trivedy in LangChain's
+a very practical definition: whenever an agent makes a mistake, you take the time to engineer a fix
+so it *never* makes that mistake again. The equation "Agent = Model + Harness" was written down by
+Vivek Trivedy in LangChain's
 [The anatomy of an agent harness](https://www.langchain.com/blog/the-anatomy-of-an-agent-harness)
-(March 2026), with the definition: a harness is *every piece of code, configuration and execution
-logic that is not the model itself*. Anthropic does not use the formula, but calls the Claude Agent
-SDK "a general-purpose agent harness" in
+(March 2026), with a definition that matches the course's: a harness is *every piece of code,
+configuration and execution logic that is not the model itself*. Anthropic does not use the formula,
+but calls the Claude Agent SDK "a general-purpose agent harness" in
 [Effective harnesses for long-running agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents),
 and back in late 2024 described agents in
 [Building effective agents](https://www.anthropic.com/engineering/building-effective-agents) as
 "LLMs using tools based on environmental feedback in a loop". That loop and that environment *are*
 the harness; it just had no name yet.
 
-In more technical terms, the harness holds: the loop that calls the model and then runs its tools,
-the tools and their descriptions, context management (what the model gets to see at each step),
-memory and state outside the context, the runtime environment (sandbox, limits), permissions and
-guardrails (what it may and may not do), verification and feedback (how we know it is right),
-observability (traces, logs, evals) and recovery (what happens after a failure).
+![Agent = LLM + harness: the model in the centre, the five harness subsystems of lecture 02 around it (Instructions, Tools, Environment, State, Feedback), and below them the two operational disciplines from the README (Scope and Session lifecycle)](blog/harness-engineering-agent-anatomy.svg)
 
-![Agent = LLM + harness: the model in the centre, eight harness components around it, connected by the loop that calls the model and runs tools](blog/harness-engineering-agent-anatomy.svg)
-
-What does the harness give the agent? Five things, each matching a typical failure:
+What does the harness give the agent? Five things, each matching one of the failure modes that the
+course's [lecture 01](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-01-why-capable-agents-still-fail/index.md) lists:
 
 - **Endurance on long work.** Real tasks span many context windows and many sessions; without state outside the context, every session starts from zero.
 - **Staying on track.** Agents try to do too much at once or quietly change the goal; the harness holds the scope and the definition of done.
@@ -94,166 +91,153 @@ What does the harness give the agent? Five things, each matching a typical failu
 - **Safety.** Permissions, sandbox, spending limits: the agent can only do what you allow.
 - **Measurability.** Traces and evals turn "it feels fine" into numbers, so you know which change actually helped.
 
-One sentence from Anthropic's harness article is worth keeping: *every component in a harness
-encodes an assumption about what the model cannot do on its own*. As models improve, some parts
-become redundant (the author dropped context resets with Opus 4.5 and sprints with Opus 4.6), but
-the space of useful harness designs does not shrink, it *moves*. A harness is therefore not
-something you write once; it is code, and it rots like code.
+One sentence from Anthropic's harness article (not from the course) is worth keeping: *every
+component in a harness encodes an assumption about what the model cannot do on its own*. As models
+improve, some parts become redundant (the author dropped context resets with Opus 4.5 and sprints
+with Opus 4.6), but the space of useful harness designs does not shrink, it *moves*. The course says
+the same thing differently in lecture 02: a harness rots like code, so audit it and pay down harness
+debt the way you pay down technical debt.
 
-## The components of a harness
+## The components of a harness, as the course lays them out
 
-learn-harness-engineering (14 lectures, 8 projects, all built around coding agents) gives a
-five-subsystem framework. Interestingly the course names it two ways. The README splits by *what
-the harness has to do*: Instructions, State, Verification, Scope, Session lifecycle. Lecture 02
-splits by *technical layer*: Instructions, Tools, Environment, State, Feedback. The two complement
-each other, so below I merge them into eight components, each answering three questions: what it
-holds, what failure it prevents, and a concrete example. Context gets its own row because the
-course treats it as a separate subsystem when it dissects Claude Code, and because it is where
-long-running research agents die most often.
+[Lecture 02](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-02-what-a-harness-actually-is/index.md) defines a harness with a five-part formula:
+**Harness = Instructions + Tools + Environment + State + Feedback**. It is also the framework the
+course uses to dissect four real products (Pi, Claude Code, Codex, DeepSeek) in its
+[harness designs](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/harness-designs/index.md) section. Missing any one part means an incomplete harness, and the agent
+"will always feel awkward to use". Below I take each part in the same shape: the plain idea, the
+concrete thing the course tells you to create, and the failure it prevents.
 
-| Component | What it holds | Failure it prevents |
-|---|---|---|
-| Instructions | system prompt, AGENTS.md, definition of done | guessed requirements, broken unwritten conventions |
-| Tools | tools + descriptions, schemas, MCP server | cannot act, or acts the wrong way |
-| Environment | sandbox, versions, allow-lists | burning context on environment errors |
-| Context | compaction, notes, sub-agents | context rot, forgetting mid-task |
-| State | progress file, feature list, git | next session restarts from scratch |
-| Scope | one task at a time, WIP=1 | many things started, none finished |
-| Verification | tests, checkers, independent evaluator | confident "done" that is not done |
-| Observability | traces, rubrics, evals | cannot fix what you cannot see |
+### Instructions: the sheet of paper on the new hire's desk
 
-### Instructions: a map, not an encyclopedia
+Put simply, this is the sheet of paper you leave on a new hire's desk on day one: what this project
+is, what the job is, what done looks like, how the team does things. Without that sheet the agent
+does not fail because it is weak; it fails because it has to guess.
 
-Put simply, this is the sheet of paper you leave on a new hire's desk on day one: what the job is,
-what done looks like, how the team does things. Without that sheet the agent does not fail because it
-is weak; it fails because it has to guess.
+The course tells you to create an `AGENTS.md` (or `CLAUDE.md`) at the repo root containing: a project
+overview and purpose, the tech stack and versions, first-run commands, non-negotiable hard
+constraints, and links to more detailed documentation. [Lecture 04](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-04-why-one-giant-instruction-file-fails/index.md) adds the size rule: about
+100 lines, a *table of contents*, not an encyclopedia; details go into `docs/` for the agent to read
+on demand. [Lecture 01](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-01-why-capable-agents-still-fail/index.md) adds the most important item on the sheet: a *definition of done* a
+command can check, such as "endpoint `GET /api/search?q=`, 20 per page, passes `pytest` and
+`mypy --strict`", instead of "add search". Failure prevented: the two top failures of lecture 01,
+vague requirements and unwritten conventions. The course adds a line worth pinning: one `AGENTS.md`
+file might be more effective than upgrading to a more expensive model.
 
-Holds: the system prompt, the instruction file at the repo root (`AGENTS.md` or `CLAUDE.md`), and a
-*definition of done* that a command can check. Prevents: the two top failures in the course's
-lecture 01, vague requirements (the agent can only guess) and unwritten conventions (the agent
-cannot follow a rule it has never seen). Example: replace "add search" with "endpoint
-`GET /api/search?q=`, 20 per page, passes `pytest` and `mypy --strict`". Lecture 04 stresses that a
-giant file backfires; keep `AGENTS.md` around 100 lines as a table of contents, and put details in
-`docs/` for the agent to read on demand. Anthropic's
-[context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
-post calls this the "right altitude" for a prompt: specific enough to guide, flexible enough to let
-the model handle the situation, no brittle hardcoded logic.
+### Tools: the toolbox, just enough and labelled
 
-### Tools: a contract between deterministic systems and a non-deterministic agent
+This is the toolbox on the desk. A good mechanic with no screwdriver can only watch; hand over a
+jumbled box with no labels and they grab the wrong tool.
 
-This is the toolbox on the desk. A good mechanic with no screwdriver can only watch; a jumbled box
-with no labels means grabbing the wrong tool. Tools need clear names and descriptions, like labels on
-each instrument.
-
-Holds: the tools, their descriptions, their parameter schemas, and how they are exposed (possibly
-over MCP, as in [post 5](#/blog/mcp-model-context-protocol)). Prevents: the agent having no way to act, or so many overlapping tools
-that it picks the wrong one. Anthropic's
+Lecture 02 gives this subsystem two sides. One: give the agent *sufficient* tool access; do not
+disable the shell "for security reasons", because an agent that cannot even run `pip install` cannot
+get anything done. Two: do not open everything either; follow least privilege. For a coding agent the
+course's list is the shell, file read and write, git, plus startup scripts and test commands. Failure
+prevented: the agent "wants to do something but can't", or has so many overlapping tools that it
+picks the wrong one. Anthropic's
 [Writing effective tools for agents](https://www.anthropic.com/engineering/writing-tools-for-agents)
-defines a tool as "a contract between deterministic systems and non-deterministic agents" and
-draws a few rules: a few tools aimed at real workflows beat a wrapper per endpoint;
-`search_contacts` beats `list_contacts` because context is finite; return high-signal information
-(drop UUIDs, drop mime types); offer a `response_format` so the model can choose concise or detailed;
-error messages must say *how to fix it*, not just "wrong". The course adds least privilege: do not
-turn off the shell "for safety" so the agent cannot install anything, but do not open everything
-either.
+adds the "labels": write tool descriptions the way you would brief a new hire, return high-signal
+information, and make error messages say how to fix the problem.
 
-### Environment: self-describing surroundings
+### Environment: a self-describing workshop
 
 This is the workshop: is the power on, is the software the right version, which doors are open. A
 broken workshop means the mechanic spends the day fixing the workshop instead of doing the job.
 
-Holds: where the agent runs, runtime versions, locked dependencies, sample data, and limits
-(network, time, memory). Prevents: the agent burning its context window on failed `pip install`
-and version conflicts instead of the real task. Example from lecture 06: make *initialization* its
-own phase with an `init.sh` (install, verify, start) and a readiness checklist of four items: can
-start, can test, can see progress, knows the next step. For a research agent the environment also
-means an allow-list of fetchable domains and a size cap per page, so a hostile web page cannot
-become a prompt injection that hijacks the agent.
+The course asks for an environment that *describes itself*: lock dependencies with `pyproject.toml`
+or `package.json`, pin the runtime with `.python-version` or `.nvmrc`, and use Docker or a
+devcontainer so it can be rebuilt identically anywhere. [Lecture 06](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-06-why-initialization-needs-its-own-phase/index.md) makes *initialization* its
+own phase, with an `init.sh` (install, verify, start) and a readiness checklist of four items: can
+start, can test, can see progress, knows the next step. Codex, as lecture 02 notes, goes further and
+gives each task its own git worktree so changes never step on each other. Failure prevented: the
+agent burning its context window on install errors and version conflicts. For a research agent the
+workshop also includes the allow-list of fetchable domains and a size cap per page, so an unknown web
+page cannot hijack the agent.
 
-### Context: a finite resource with diminishing returns
+### State: the notebook and the cabinet
 
-Context is what the model can "see" right now, like a desk with limited surface. Pile papers on it
-and the important sheet gets buried. The harness has to clear the desk: file old papers away in a
-cabinet and leave out only what is needed next.
+If the context (what the model can "see" right now) is the desk surface, state is the notebook and
+the cabinet: what was done, what is in progress, what is left, written down outside so the next shift
+can open it. Without the notebook, every new shift starts as if there had been no shift before.
 
-Holds: the policy for *what sits in the context window at each step*. Prevents: *context rot*, the
-model recalling less as the context grows, and the agent "running out of breath" mid-task.
-Anthropic treats context as a finite attention budget; the goal is *the smallest set of tokens with
-the highest signal*. Three techniques for long work: **compaction** (summarize the history, keep
-architectural decisions, open bugs and implementation details, drop redundant tool output; the
-lightest and safest form is clearing old tool results), **structured note-taking** (the agent writes
-`NOTES.md` outside the context and reads it back), and **sub-agents** (each sub-task runs in a clean
-context and returns a 1-2 thousand token summary). When the course dissects Claude Code it finds a
-multi-stage compaction pipeline: lossless pruning first, structured distillation next, LLM
-summaries last, with circuit breakers against over-compaction.
+The concrete thing lecture 02 asks for is a simple `PROGRESS.md` with three sections: done, in
+progress, blocked; updated before a session ends, read when the next one starts.
+[Lecture 05](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-05-why-long-running-tasks-lose-continuity/index.md) widens it to a trio: the progress file, a decision log, and git commits as
+checkpoints, with one metric to watch: *rebuild cost*, the time a new session needs to become
+productive. [Lecture 08](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-08-why-feature-lists-are-harness-primitives/index.md) adds a machine-readable feature list where each item is a triple
+(behaviour description, verification command, state), and a state moves to `passing` only when the
+verification command succeeds. Failure prevented: losing continuity between sessions, redoing finished
+work, or "looking around, seeing progress, and declaring the whole project done".
 
-### State: memory that lives outside the context
+Context management within a session belongs to this subsystem too, because it is the same question
+of what to keep and what to drop. When the course dissects [Claude Code](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/harness-designs/claude-code/index.md) it finds a multi-stage
+compaction pipeline: lossless pruning first (removing redundant tool results), structured distillation
+next, LLM summaries last, with circuit breakers against over-compaction. Anthropic's
+[context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
+post names the same three techniques for long work: compaction, structured notes outside the context,
+and sub-agents that return a summary.
 
-If context is the desk, state is the notebook and the cabinet: what was done, what is in progress,
-what is left, written down outside so the next shift can open it. Without the notebook, every new
-shift starts as if there had been no shift before.
+### Feedback: the examiner, separate from the student
 
-Holds: a progress file, a task list with states, git history, a handoff note. Prevents: losing
-continuity between sessions, redoing finished work, or "looking around, seeing progress, and
-declaring the whole project done" (a failure Anthropic records verbatim). Anthropic's example: an
-`init.sh`, a `claude-progress.txt` logging what was done, a `feature_list.json` with over 200
-features all starting as `failing`, where the agent may only flip the `passes` field and must never
-delete or edit tests. They chose JSON over Markdown because the model is less likely to rewrite
-JSON on its own. The course (lecture 08) calls each list item a triple *(behaviour description,
-verification command, state)*, and rules that a state moves to `passing` only when the verification
-command succeeds, executed by the harness, not written by the agent.
+This is the examiner. Grade your own paper and you will find yourself right; so does an agent.
+"Done" has to be proven by a test that actually runs, not by a feeling.
 
-### Scope: one thing at a time
-
-This is the "one thing at a time" rule. Anyone who has had five tasks open at once knows how it
-ends: all of them half-done. An agent is exactly the same, it just gets there faster.
-
-Holds: a limit on open work (WIP, work in progress) and the boundary of each task, written to a
-file. Prevents: the twin failures lecture 07 calls *overreach* and *under-finish*. Example:
-Anthropic asked its coding agent to work on one feature per session and found this critical against
-the urge to "one-shot the app". The course measured it: with the same eight features, the
-unconstrained mode left three half-done; WIP=1 finished seven after four sessions. Lines of code and
-completion rate were negatively correlated.
-
-### Verification: confidence is not correctness
-
-This is the examiner, separate from the student. Grade your own paper and you will find yourself
-right; so does an agent. "Done" has to be proven by a test that actually runs, not by a feeling.
-
-Holds: verification commands, automatic checkers, and an evaluator *separate from* the maker.
-Prevents: the most common failure of all, *declaring victory early*. Lecture 09 calls it the
-verification gap, the distance between the agent's confidence and actual correctness, and proposes
-three layers: syntax passes, behaviour passes (tests run, the app starts), system passes
-(end-to-end). Anthropic learned the same lesson the hard way: unit tests and `curl` passed while the
-app broke in real use; only when the agent was told to use browser automation and "test as a human
-user would" did results improve sharply. And because a generator tends to praise its own work, they
-split out an evaluator with hard thresholds per criterion. Lecture 13 of the course turns this into
-a principle: *the maker and the checker must be separate*, sometimes two different models.
-
-### Observability: you cannot fix what you cannot see
-
-This is the workshop's camera and logbook: who did what and when, what it cost, how it turned out.
-Without it, when something breaks all you know is "it broke", not where to fix it.
-
-Holds: a trace of every step (which tool, which input, how many tokens), runtime logs, scoring
-rubrics, and an eval suite. Prevents: blind retries, gut-feeling evaluation, and handoffs that lose
-information. Lecture 11 splits it in two layers: *runtime observability* answers "what did the
-system do", *process observability* answers "why should this change be accepted" (sprint contracts,
-rubrics). Anthropic's
+Lecture 02 calls this the subsystem with the *highest return on investment*, and the concrete step
+is cheap: list the verification commands explicitly in `AGENTS.md` (tests, type check, lint, and one
+command that runs them all). [Lecture 09](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-09-why-agents-declare-victory-too-early/index.md) stacks verification in three layers that must pass in
+order: syntax, behaviour (tests run, the app starts), system (end-to-end). [Lecture 10](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-10-why-end-to-end-testing-changes-results/index.md) shows
+that end-to-end tests not only catch defects but change how the agent writes code, and that
+architectural rules must be *executable* rather than sit in a document. [Lecture 13](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-13-loop-engineering/index.md) turns it
+into a principle: *the maker and the checker must be separate*, sometimes two different models. Logs
+and traces live here as well: lecture 02 describes Codex shipping with an observability stack (logs,
+metrics, traces) so every change is verified in its own environment, and [lecture 11](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-11-why-observability-belongs-inside-the-harness/index.md) splits
+observability into two layers, runtime (what the system did) and process (why this change should be
+accepted: sprint contracts, scoring rubrics). Failure prevented: the most common one, *declaring
+victory early*. Anthropic's
 [Demystifying evals for AI agents](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)
-supplies the vocabulary: a *task* (one test case), a *trial* (one run), a *grader* (scoring logic),
-a *transcript* (the full record), an *outcome* (the final state of the environment, not what the
-agent claims). Its most valuable advice: grade the *result*, not the *path*; use code graders where
-possible, LLM graders where necessary, humans where it really matters; and do not trust a score
-until you have read transcripts. Nor should you wait: 20 to 50 tasks drawn from real failures is a
-good start.
+adds the vocabulary for measuring: task, trial, grader, transcript, outcome; grade the result, not the
+path; and pass^k for consistency.
 
-Finally, how to *choose* components: hold the model fixed, remove one component at a time, and see
-which removal hurts most. The course tells of a team using the same GPT-4o on a 20,000-line React
+### Two operational disciplines: Scope and Session lifecycle
+
+The course's [README](https://github.com/walkinglabs/learn-harness-engineering#what-harness-engineering-actually-means) names the five subsystems a different way, from the angle of *what
+the harness has to do*: Instructions, State, Verification, Scope, Session Lifecycle. The first three
+coincide with lecture 02 (Verification is Feedback). The other two are not new technical layers but
+two disciplines laid on top of the five.
+
+**Scope.** This is the "one thing at a time" rule. Anyone who has had five tasks open at once knows
+how it ends: all of them half-done. An agent is exactly the same, it just gets there faster. The
+README says: constrain the agent to one feature at a time, no overreach, no half-finishing three
+things, no rewriting the feature list to hide unfinished work. [Lecture 07](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-07-why-agents-overreach-and-under-finish/index.md) calls it WIP=1
+(one piece of work in progress) and names the twin failures *overreach* and *under-finish*; the
+course measured it with the same eight features: the unconstrained mode left three half-done, WIP=1
+finished seven after four sessions. The boundary of the work has to live in a file, and that file is
+the feature list of lecture 08.
+
+**Session lifecycle.** This is the start-of-shift and end-of-shift routine. At the start: read the
+instruction sheet, run `init.sh`, read the progress notebook, look at the task list, check git
+history, then pick *one* task. At the end: update the notebook, update the task list, write down what
+is still broken, commit when it is safe, and leave a clean restart path for the next shift.
+[Lecture 12](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-12-why-every-session-must-leave-a-clean-state/index.md) defines "clean state" as five conditions, none optional: build passes, tests
+pass, progress recorded, no stale artifacts, startup path available. Miss one and the session is not
+done.
+
+| README (what to do) | Lecture 02 (technical layer) | Note |
+|---|---|---|
+| Instructions | Instructions | same |
+| State | State | same; in-session context lives here too |
+| Verification | Feedback | one thing, two names |
+| Scope | (discipline on top of State) | WIP=1, the feature list is the boundary |
+| Session Lifecycle | (discipline on top of Environment and State) | init at start, clean state at end |
+| | Tools, Environment | the README folds them into "the working environment" |
+
+Finally, how to *choose* where to invest, also from lecture 02. First, the five-tuple audit: score
+each subsystem 1 to 5, take the lowest, spend 30 minutes improving it, and watch how the agent
+changes. Second, exclusion: hold the model fixed, remove one subsystem at a time, and see which
+removal hurts most. The course tells of a team using the same GPT-4o on a 20,000-line React
 project: README only, 1 run in 5 succeeded; add `AGENTS.md`, 60%; add verification commands, 80%;
-add a progress file, stable at 80 to 100%. Four rounds, no model change. But ablation only says
-"which component is worth most right now", not "where the bottleneck is"; for that you have to
-read the failure logs and attribute each failure to a layer.
+add a progress file, stable at 80 to 100%. Four rounds, no model change. But exclusion only says
+"which component is worth most right now", not "where the bottleneck is"; for that you have to read
+the failure logs and attribute each failure to a layer.
 
 ## A real case: a research agent with a complete harness
 
@@ -283,117 +267,132 @@ whole loop. The model decides *what to do next*; the harness decides *within whi
 The design below assumes you call the model's API directly through the official SDK and write the
 loop yourself, so every harness component is visible instead of hidden inside a framework; the tools
 can be wrapped as MCP. If you use LangGraph as in [post 4](#/blog/langgraph-ai-agents), each box in the diagram becomes a node and the graph state
-replaces `progress.json`; the harness components stay the same, they just move house.
+replaces `PROGRESS.md` and `questions.json`; the harness components stay the same, they just move house.
 
 ```text
 research-agent/
-├── AGENTS.md                 # the agent's map: goal, citation rules, verify commands
-├── config.yaml               # model, budgets, compaction threshold, domain allow-list
-├── run.py                    # entry point: python run.py "question" [--resume RUN_ID]
-├── agent/                    # what the "brain" uses: the loop and the prompts
-│   ├── loop.py               # call model -> run tools -> save state; stop conditions
-│   ├── prompts/
-│   │   ├── system.md         # role, plan-search-read-note-synthesize, report format
-│   │   └── compaction.md     # history-summary prompt: what to keep, what to drop
-│   └── report_schema.py      # report structure: paragraphs + [n] + source list
-├── tools/                    # what the agent can do (can be wrapped as MCP)
-│   ├── registry.py           # tool directory: name, description, schema, policy flags
-│   ├── search.py             # web search: domain filter, compact title+url+snippet
+├── AGENTS.md                 # [Instructions] ~100-line map: purpose, rules, checks
+├── docs/
+│   ├── report-format.md      # [Instructions] what a finished report looks like
+│   └── source-policy.md      # [Instructions] which sources count, how to quote
+├── init.sh                   # [Lifecycle] install, check keys, smoke search, print state
+├── pyproject.toml            # [Environment] locked dependencies and Python version
+├── .devcontainer/            # [Environment] rebuild identically; network allow-list
+├── config.yaml               # [Environment] model, budgets, thresholds, domains
+├── agent/
+│   ├── loop.py               # loop: call model -> run tool -> save state -> stop?
+│   └── prompts/
+│       ├── system.md         # [Instructions] role and procedure, read every turn
+│       └── compaction.md     # [State] what a history summary must keep and drop
+├── tools/                    # [Tools] least privilege: read-only / network flags
+│   ├── registry.py           # tool directory: name, description, schema, flags
+│   ├── search.py             # search allowed domains: title + URL + snippet
 │   ├── fetch.py              # page -> clean text, truncated to a cap, raw copy saved
-│   ├── notes.py              # write and read back structured notes: claim, quote, url
-│   ├── submit_report.py      # runs verifiers; returns errors for the model to fix
-│   └── mcp_server.py         # exposes the tools above over MCP for other agents to reuse
-├── harness/                  # what governs the loop, independent of the model
-│   ├── context.py            # compaction: clear old tool_results, then summarize
-│   ├── state.py              # progress.json + notes.md: load, save, resume, handoff
-│   ├── policy.py             # permission gate: which tool, which domain, how many times
-│   ├── sandbox.py            # network/time/size limits for fetch
-│   ├── budget.py             # counts tokens, steps, money; decides when to stop
-│   ├── tracing.py            # trace.jsonl: every step, tool call, usage, verdict
-│   └── verifiers/
-│       ├── citations.py      # every claim has [n]; every [n] points to a fetched URL
+│   ├── notes.py              # write and read back notes: claim, quote, url
+│   ├── submit_report.py      # [Feedback] hands draft to checker; only path to done
+│   └── mcp_server.py         # exposes the tools over MCP for other agents
+├── harness/
+│   ├── policy.py             # [Tools] permission gate: tool, domain, call count
+│   ├── context.py            # [State] compaction: clear old results, then summarize
+│   ├── budget.py             # [Lifecycle] counts steps and tokens; stop decision
+│   ├── handoff.py            # [Lifecycle] clean-state check and handoff note on exit
+│   ├── tracing.py            # [Feedback] trace.jsonl: steps, tool calls, verdicts
+│   └── verifiers/            # [Feedback] checker separate from the model
+│       ├── citations.py      # every figure has [n]; every [n] points to a fetched URL
 │       └── structure.py      # all sections present, minimum sources, no empty paragraphs
-├── evals/
-│   ├── tasks.jsonl           # 30 questions from real failures + grading criteria
-│   ├── graders.py            # code graders (required domains, every claim sourced)
-│   └── run_evals.py          # k trials per task, pass@k and pass^k, keeps transcripts
+├── evals/                    # [Feedback] 30 tasks from real failures; pass^k
+│   ├── tasks.jsonl
+│   └── run_evals.py
 └── runs/
     └── 2026-10-28_harness-evidence/
-        ├── progress.json     # current step, plan, URLs opened, status
-        ├── notes.md          # notes the agent wrote, re-read after compaction
-        ├── sources/          # raw copy of each page, so verifiers can check quotes
-        ├── trace.jsonl       # trace of this run
-        └── report.md         # final report, exists only once the verifiers pass
+        ├── PROGRESS.md       # [State] done / in progress / blocked / next step
+        ├── questions.json    # [Scope] sub-questions + state; one active at a time
+        ├── notes.md          # [State] the agent's own notes, re-read after compaction
+        ├── sources/          # [State] raw copy of each page for the checker
+        ├── trace.jsonl       # [Feedback] trace of this run
+        └── report.md         # exists only once the checker has passed
 ```
 
-`agent/` and `tools/` are what every demo shows. `harness/` is what separates a demo from a system,
-and it imports nothing from the model: swap the model or the framework and `harness/` still works.
-`evals/` and `runs/` are the evidence; without them you only have a feeling.
+The labels in square brackets name the course subsystem each part belongs to. Read by label, you
+find all five layers of lecture 02 (Instructions, Tools, Environment, State, Feedback) and the two
+README disciplines (Scope through `questions.json`, Lifecycle through `init.sh`, `budget.py`,
+`handoff.py`). `agent/` and `tools/` are what every demo shows. `harness/` is what separates a demo
+from a system, and it imports nothing from the model: swap the model or the framework and `harness/`
+still works. `evals/` and `runs/` are the evidence; without them you only have a feeling.
 
 ### Walking one question through the system
 
-Run `python run.py "What measured evidence shows that changing the harness, not the model, changes
-an agent's results?"`. `state.py` creates the run folder, a `progress.json` with `step: 0`, and the
-tracer opens `trace.jsonl`. At step 0 the model receives the system prompt (from `system.md`, plus
-a condensed state from `progress.json`) and plans: three sub-questions (controlled experiments with
-the same model, benchmarks before and after a harness change, ablation studies) and the preferred
-source types (vendor engineering blogs, repos, papers). The plan is written to `progress.json`; from
-now on it is what the model re-reads after every compaction.
+**Start of shift (Lifecycle).** You run `init.sh`: it installs dependencies from the lockfile, checks
+the API keys, runs one smoke search to confirm the network and the allow-list work, and prints the
+state. Then you start the agent with the question. The loop follows the README's start-of-session
+routine: read `AGENTS.md`, create the run folder with an empty `PROGRESS.md` and an empty
+`questions.json`, open `trace.jsonl`.
 
-Steps 1 to 4: the model calls `search` for each sub-question. Every call passes through
-`policy.py`: `search` is read-only and allowed, but the results are filtered by the domain
-allow-list in `config.yaml`. The tool returns at most eight hits, each just a title, a URL and a
-snippet; no HTML, no stray metadata. The model picks three URLs and calls `fetch`. `sandbox.py`
-caps each page at 200 KB and 15 seconds, saves the raw copy under `sources/`, and returns clean
-truncated text with a line "truncated at 60%, use `offset` to continue" if the page is long. After
-reading a page the model calls `write_note` with three fields: claim (one sentence), quote (short,
-verbatim), url. `notes.py` appends to `notes.md` and marks the URL as read in `progress.json`.
+**Planning (Instructions, Scope).** At step 0 the model receives the system prompt (role, procedure,
+report format from `docs/report-format.md`) and writes a plan: three sub-questions (controlled
+experiments with the same model, benchmarks before and after a harness change, remove-one-at-a-time
+studies) and the preferred source types. The harness writes the three sub-questions to
+`questions.json`, each with a state and a done criterion ("at least two fetched sources, with
+notes"), the triple of lecture 08. Only one is marked `active`. This is lecture 07's WIP=1 applied to
+research: the model may not search for all three at once.
 
-Step 12: `budget.py` reports that the estimated context has crossed the 120 thousand token
-threshold. `context.py` does two things in order: first it clears the content of old `tool_result`
-blocks (keeping the six most recent), because that is the lightest and safest compaction; it
-measures again, and if the history is still too long it calls the model with `compaction.md` to
-summarize the older part into one passage, keeping exactly what the prompt asks for: the plan,
-which sub-questions are closed, which sources were read and which not, open doubts. The new history
-is the summary plus the last few turns. The agent does not panic about lost detail: the detail is
-in `notes.md`, and it can call the notes tool to read them back.
+**Search, read, note (Tools, Environment).** Steps 1 to 4: the model calls `search` for the active
+sub-question. Every call passes the permission gate: `search` is a read-only tool and allowed, but
+its results are filtered by the domains in `config.yaml`. The tool returns at most eight hits, each
+just a title, a URL and a snippet. The model picks three URLs and calls `fetch`; the environment caps
+each page at 200 KB and 15 seconds, saves the raw copy under `sources/`, and returns clean truncated
+text with a hint on how to read further if the page is long. After reading, the model calls the notes
+tool with three fields: claim (one sentence), quote (short, verbatim), url. The harness appends to
+`notes.md` and marks the URL as *fetched*. When the sub-question meets its criterion, the harness,
+not the model, moves it to `passing` in `questions.json` and opens the next one.
 
-Step 20: the model sees that every sub-question has at least two sources, writes a draft, and
-calls `submit_report`. This is where the harness shows its intent: submitting the report *is a
-tool*, and that tool runs `verifiers/`. `citations.py` finds that paragraph three states a number
-without a `[n]`, and that `[4]` points to a URL that appeared in search results but was never
-`fetch`ed. The tool returns an error result with two lines naming the paragraph, the URL, and the
-fix ("fetch the URL and take a note, or drop the claim"). The model fetches the page, takes a note,
-repairs the draft, and resubmits at step 23. The verifiers pass, `report.md` is written,
-`progress.json` flips to `done: true`, the loop stops.
+**Compaction (State).** At step 12 the counter reports that the estimated context has crossed the
+120 thousand token threshold. The harness does two things in order: it clears the contents of old
+tool results (keeping the six most recent), the lightest and safest compaction; it measures again,
+and if the history is still too long it calls the model with `compaction.md` to summarize the older
+part, keeping exactly what that file asks for: the plan, closed sub-questions, sources read and not
+read, open doubts. The agent does not panic about lost detail: the detail is in `notes.md` and
+`questions.json`, which it can read back.
 
-If at step 23 the budget of 40 steps or 400 thousand tokens had run out first, `loop.py` would not
-try to submit an unverified report; it writes a handoff entry to `progress.json` (where it is, what
-is missing, what the next step is) and exits with an error code. The next `--resume` run reads the
-progress, notes and source list and starts at step 23, not step 0. Throughout, `trace.jsonl` has one
-line per step and per tool call; `run_evals.py` reruns this question and 29 others three times each
-and reports pass^3, the number that tells you how *consistent* the system is, not just whether it is
-sometimes right.
+**Submit and check (Feedback).** At step 20 all three sub-questions are `passing`; the model writes
+a draft and calls `submit_report`. This is where the harness shows its intent: submitting the report
+*is a tool*, and that tool runs the checkers in `verifiers/`. The citation checker finds that
+paragraph three states a figure without a `[n]`, and that `[4]` points to a URL that appeared in
+search results but was never fetched. The tool returns an error result with two lines naming the
+paragraph, the URL, and the fix ("fetch the URL and take a note, or drop the claim"). The model
+fetches the page, takes a note, repairs the draft, and resubmits at step 23. The checker passes and
+`report.md` is written.
+
+**End of shift (Lifecycle).** Before exiting, `handoff.py` runs the clean-state check, lecture 12's
+five conditions translated to a research agent: the report passed the checker, `PROGRESS.md` is
+updated, `questions.json` matches reality, no temporary files are left in `sources/`, and the rerun
+command works. If the budget of 40 steps or 400 thousand tokens had run out before step 23, the loop
+would not try to submit an unverified report; it writes to `PROGRESS.md` where it is, what is
+missing and what the next step is, and exits with an error code. The next run on the same run folder
+reads `PROGRESS.md`, `questions.json` and `notes.md` and starts at step 23, not step 0. Throughout,
+`trace.jsonl` has one line per step and per tool call; `run_evals.py` reruns this question and 29
+others three times each and reports pass^3, the number that tells you how *consistent* the system is,
+not just whether it is sometimes right.
 
 ### The four pieces that decide reliability
 
 You do not need to read code to understand this harness. You need to know what each piece does,
 where it sits in the tree, and why the system drifts without it.
 
-| Piece | Lives in | What it does | Why it must exist |
-|---|---|---|---|
-| The loop | agent/loop.py | calls the model, runs tools, saves state, decides to stop | the model may not declare itself done |
-| Policy gate | harness/policy.py | approves every tool call before it runs | blocks unknown domains, forbidden tools, overuse |
-| Verifiers | harness/verifiers/ | check the report with plain code | a model grading itself always finds itself right |
-| Compaction | harness/context.py | clears old results, then summarizes | long jobs outgrow one context window |
+| Piece | Lives in | Subsystem | What it does | Why it must exist |
+|---|---|---|---|---|
+| The loop | agent/loop.py | skeleton of the whole harness | calls the model, runs tools, saves state, checks stop | the model may not declare itself done |
+| Policy gate | harness/policy.py | Tools | approves every tool call before it runs | blocks unknown domains, forbidden tools, overuse |
+| Checker | harness/verifiers/ | Feedback | checks the report with plain code | a model grading itself always finds itself right |
+| Compaction | harness/context.py | State | clears old results, then summarizes | long jobs outgrow one context window |
 
 **The loop.** Each turn does one fixed sequence: check the budget (steps, tokens) and stop if it is
 spent; compact the context if it is over the threshold; call the model with the system prompt, a
-condensed `progress.json` and the tool list; if the model calls tools, pass each call through the
+condensed `PROGRESS.md` and `questions.json`, and the tool list; if the model calls tools, pass each call through the
 policy gate before running it and hand the result (including errors, with a reason) back to the
-model; at the end of the turn save `progress.json` so the next session can resume. Two design
+model; at the end of the turn save `PROGRESS.md` so the next session can resume. Two design
 decisions live here. First, the model going quiet does not mean done: the only path to "done" is
-`submit_report` passing the verifiers; if the model stops without submitting, the loop tells it to
+`submit_report` passing the checker; if the model stops without submitting, the loop tells it to
 continue. That is the course's *pass-state gating* applied to a report instead of a feature. Second, a
 refused tool call still gets an answer with a reason, so the model changes course instead of being
 silently ignored. When the budget runs out, the loop does not try to submit an unverified report; it

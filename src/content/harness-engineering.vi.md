@@ -34,54 +34,52 @@ walkinglabs mở đầu bằng đúng lời khuyên ngược lại: khi hỏng, 
 
 ## Agent = LLM + harness
 
-Nói nôm na thế này. Model là bộ não: nó đọc, suy nghĩ và quyết định bước tiếp theo. Nhưng một bộ
-não đứng một mình không làm xong được một việc dài. Nó cần một bản mô tả việc cần làm, một cái bàn
-với dụng cụ, một cuốn sổ ghi lại những gì đã làm, vài quy tắc về điều được và không được làm, và một
-người kiểm tra lại trước khi được nói "xong". Toàn bộ phần "xung quanh bộ não" ấy gọi là harness.
-Agent là bộ não cộng với phần xung quanh đó.
+Khoá học mở bài 02 bằng một hình ảnh, và mình mượn luôn vì nó nói đúng bản chất. Hình dung bạn
+là một kỹ sư mới được tuyển, bị thả vào một dự án không có một dòng tài liệu. Không README, code
+không có chú thích, không ai nói chạy test bằng lệnh gì, file cấu hình CI chôn ở đâu đó. Bạn có
+viết được code tốt không? Có thể, nếu bạn đủ giỏi và đủ kiên nhẫn. Nhưng bạn sẽ tốn phần lớn thời
+gian để "đoán xem dự án này là gì" thay vì giải bài toán. Agent ở đúng tình cảnh đó, và còn tệ
+hơn: bạn ít ra còn hỏi được đồng nghiệp ngồi cạnh; agent chỉ thấy đúng những file bạn đưa cho nó và
+chỉ chạy được những lệnh bạn cho phép.
 
-Hình dung thế này. Bạn tuyển được một kỹ sư rất giỏi. Ngày đầu, bạn ném cho họ một câu "làm tính
-năng tìm kiếm nhé" rồi đi họp. Không tài liệu, không ai nói cách chạy thử, không ai nói quy ước của
-team, không ai review. Người đó vẫn giỏi, nhưng sẽ đoán sai yêu cầu, dùng nhầm thư viện, và tự tin
-báo xong vì không có gì để tự kiểm. Cũng người đó, với một bản brief rõ, một máy đã cài sẵn, một
-checklist "xong là thế nào", quyền truy cập vừa đủ, và một người review độc lập, sẽ làm ra sản phẩm
-dùng được. Người không đổi; thứ đổi là mọi thứ quanh người đó. Agent cũng y như vậy, và còn khó hơn:
-người mới ít nhất còn hỏi được đồng nghiệp, agent chỉ thấy đúng những file bạn đưa và những lệnh bạn
-cho chạy. Khoá học dùng đúng hình ảnh này ở
-[bài 02](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-02-what-a-harness-actually-is/index.md).
+Từ đó, định nghĩa của khoá học rất gọn: harness là *mọi thứ nằm ngoài trọng số của model*. Trọng
+số là phần "bộ não" đã được huấn luyện xong, bạn không sửa được. Mọi thứ còn lại bạn dựng quanh nó,
+từ tờ chỉ dẫn, bộ dụng cụ, chỗ làm việc, cuốn sổ ghi tiến độ, cho tới cách kiểm tra kết quả, đều là
+harness. Nói nôm na: cái gì không phải trọng số thì là harness. Đi kèm là một nguyên tắc nghe lạ
+nhưng rất quan trọng: *repo là nguồn sự thật duy nhất*. Thứ gì agent không nhìn thấy trong repo thì,
+với nó, thứ đó không tồn tại. Quy ước nằm trong đầu bạn hay trong một tin nhắn Slack ba tháng trước
+coi như không có.
 
 Vậy harness giúp gì cho agent? Nó giúp bộ não làm việc dài mà không trôi: biết mình đang ở đâu sau
 khi "trí nhớ ngắn hạn" đầy, không lặp lại lỗi đã mắc, không tự ý mở rộng việc, không làm điều bị
 cấm, và không được nói "xong" cho đến khi có bằng chứng. Harness không làm model thông minh thêm
-chút nào. Nó làm cho sự thông minh đó cho ra kết quả đáng tin.
+chút nào. Khoá học nói thẳng: *model quyết định viết code gì; harness quyết định khi nào, ở đâu và
+viết thế nào*. Nó không làm model giỏi hơn; nó làm đầu ra của model đáng tin.
 
 ### Công thức này từ đâu ra
 
-Công thức ngắn đến mức dễ bị coi là khẩu hiệu, nên nói rõ nguồn. Thuật ngữ *harness engineering*
+Công thức ngắn đến mức dễ bị coi là khẩu hiệu, nên nói rõ nguồn. Khoá học
+[learn-harness-engineering](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-02-what-a-harness-actually-is/index.md) tự nhận mình tổng hợp từ hai nguồn chính: bài harness engineering
+của OpenAI và các bài về harness cho agent chạy dài của Anthropic. Thuật ngữ *harness engineering*
 được Mitchell Hashimoto dùng trong bài
 [My AI adoption journey](https://mitchellh.com/writing/my-ai-adoption-journey) (tháng 2/2026) với
 định nghĩa rất thực dụng: mỗi lần agent mắc lỗi, bạn bỏ công kỹ thuật hoá một giải pháp để nó
-*không bao giờ* mắc lại lỗi đó, bằng chỉ dẫn trong `AGENTS.md` hoặc bằng tool viết hẳn hoi. Công
-thức "Agent = Model + Harness" được Vivek Trivedy viết thành câu trong bài
+*không bao giờ* mắc lại lỗi đó. Công thức "Agent = Model + Harness" được Vivek Trivedy viết thành
+câu trong bài
 [The anatomy of an agent harness](https://www.langchain.com/blog/the-anatomy-of-an-agent-harness)
-của LangChain (tháng 3/2026), kèm định nghĩa: harness là *mọi đoạn code, cấu hình và logic thực
-thi không phải là model*. Anthropic không dùng công thức đó, nhưng gọi Claude Agent SDK là "một
-agent harness đa dụng" trong
+của LangChain (tháng 3/2026), với định nghĩa trùng với khoá học: harness là *mọi đoạn code, cấu
+hình và logic thực thi không phải là model*. Anthropic không dùng công thức đó, nhưng gọi Claude
+Agent SDK là "một agent harness đa dụng" trong
 [Effective harnesses for long-running agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents),
 và từ cuối 2024 đã mô tả agent trong
 [Building effective agents](https://www.anthropic.com/engineering/building-effective-agents) là
 "LLM dùng tool dựa trên phản hồi từ môi trường, trong một vòng lặp". Vòng lặp và môi trường ấy
 chính là harness, chỉ chưa có tên.
 
-Nói bằng ngôn ngữ kỹ thuật hơn, harness gồm: vòng lặp gọi model rồi chạy tool, bộ tool và mô tả
-của chúng, cách quản lý context (những gì model được nhìn thấy ở mỗi bước), bộ nhớ và state ngoài
-context, môi trường chạy (sandbox, giới hạn), quyền và guardrail (được làm gì, không được làm gì),
-kiểm chứng và phản hồi (sao biết là đúng), quan sát (trace, log, eval) và phục hồi (lỗi rồi làm gì
-tiếp).
+![Sơ đồ Agent = LLM + harness: model ở giữa, năm hệ con của harness theo bài 02 bao quanh (Instructions, Tools, Environment, State, Feedback), bên dưới là hai kỷ luật vận hành theo README (Scope và Session lifecycle)](blog/harness-engineering-agent-anatomy.svg)
 
-![Sơ đồ Agent = LLM + harness: model ở giữa, tám thành phần harness bao quanh, vòng lặp gọi model và chạy tool nối chúng lại](blog/harness-engineering-agent-anatomy.svg)
-
-Harness mang lại gì cho agent? Năm thứ, và chúng đối ứng với năm kiểu thất bại điển hình:
+Harness mang lại gì cho agent? Năm thứ, và chúng đối ứng với năm kiểu thất bại mà
+[bài 01](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-01-why-capable-agents-still-fail/index.md) của khoá học liệt kê:
 
 - **Bền trên việc dài.** Việc thật kéo qua nhiều context window và nhiều phiên; không có state ngoài context thì mỗi phiên bắt đầu từ số không.
 - **Đi đúng hướng.** Agent hay làm quá nhiều việc cùng lúc hoặc tự đổi mục tiêu; harness giữ phạm vi và định nghĩa "xong".
@@ -89,151 +87,143 @@ Harness mang lại gì cho agent? Năm thứ, và chúng đối ứng với năm
 - **An toàn.** Quyền, sandbox, giới hạn chi tiêu: agent chỉ làm được những gì bạn cho phép.
 - **Đo được.** Trace và eval biến "cảm giác nó ổn" thành số liệu, để bạn biết thay đổi nào thực sự có ích.
 
-Một câu đáng nhớ từ bài của Anthropic về harness: *mỗi thành phần trong harness mã hoá một giả
-định về điều model chưa tự làm được*. Khi model mạnh lên, vài thành phần trở nên thừa (tác giả bỏ
-được context reset khi chuyển lên Opus 4.5, bỏ sprint khi lên Opus 4.6), nhưng không gian harness
-không co lại mà *dịch chuyển*. Harness vì thế không phải thứ viết một lần; nó là code, và nó cũng
-mục như code.
+Một câu đáng nhớ từ bài của Anthropic về harness (không phải từ khoá học): *mỗi thành phần trong
+harness mã hoá một giả định về điều model chưa tự làm được*. Khi model mạnh lên, vài thành phần trở
+nên thừa (tác giả bỏ được context reset khi chuyển lên Opus 4.5, bỏ sprint khi lên Opus 4.6), nhưng
+không gian harness không co lại mà *dịch chuyển*. Khoá học nói cùng ý bằng cách khác ở bài 02:
+harness mục như code, phải kiểm định và trả nợ harness như trả nợ kỹ thuật.
 
-## Các thành phần của một harness
+## Các thành phần của harness, theo khoá học
 
-Khoá học learn-harness-engineering (14 bài giảng, 8 project, tất cả xoay quanh coding agent) đưa
-ra một khung năm hệ con. Thú vị là khoá học dùng hai cách gọi. README chia theo *việc harness
-phải làm*: Instructions, State, Verification, Scope, Session lifecycle. Bài 02 chia theo *lớp kỹ
-thuật*: Instructions, Tools, Environment, State, Feedback. Hai cách bổ nhau, nên dưới đây tôi gộp
-lại thành tám thành phần, mỗi thành phần trả lời ba câu: nó chứa gì, nó chặn lỗi nào, ví dụ cụ
-thể là gì. Phần "context" được tách riêng vì khi phân tích Claude Code, khoá học coi nó là một hệ
-con độc lập, và vì nó là chỗ agent nghiên cứu dài hơi hay chết nhất.
+[Bài 02](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-02-what-a-harness-actually-is/index.md) của khoá học định nghĩa harness bằng một công thức năm phần:
+**Harness = Instructions + Tools + Environment + State + Feedback**. Đây cũng là khung mà khoá học
+dùng để mổ xẻ bốn sản phẩm thật (Pi, Claude Code, Codex, DeepSeek) trong mục
+[harness designs](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/harness-designs/index.md). Thiếu bất kỳ phần nào, harness coi là chưa hoàn chỉnh và agent "dùng lúc
+nào cũng thấy gượng". Dưới đây mình đi qua từng phần theo một khuôn: bản chất nói nôm na, thứ cụ
+thể khoá học bảo bạn tạo ra, và lỗi nó chặn được.
 
-| Thành phần | Chứa gì | Chặn lỗi nào |
-|---|---|---|
-| Instructions | system prompt, AGENTS.md, định nghĩa xong | đoán sai yêu cầu, phạm convention ngầm |
-| Tools | tool + mô tả, schema, MCP server | không làm được việc, hoặc làm sai cách |
-| Environment | sandbox, phiên bản, allow-list | đốt context vào lỗi môi trường |
-| Context | compaction, ghi chú, sub-agent | context rot, quên giữa chừng |
-| State | progress file, feature list, git | phiên sau làm lại từ đầu |
-| Scope | một việc một lúc, WIP=1 | làm nhiều, xong chẳng cái nào |
-| Verification | test, checker, evaluator độc lập | tự tin báo xong khi chưa xong |
-| Observability | trace, rubric, eval | không sửa được cái không nhìn thấy |
+### Instructions: tờ giấy trên bàn người mới
 
-### Instructions: bản đồ, không phải bách khoa
+Nói đơn giản, đây là tờ giấy bạn để trên bàn người mới ngày đầu: dự án này là gì, việc là gì, xong
+là thế nào, team làm theo lệ gì. Không có tờ giấy đó, agent làm sai không phải vì kém, mà vì phải
+đoán.
 
-Nói đơn giản, đây là tờ giấy bạn để trên bàn người mới ngày đầu: việc là gì, xong là thế nào, team
-làm theo lệ gì. Không có tờ giấy đó, agent làm sai không phải vì kém, mà vì phải đoán.
+Khoá học bảo bạn tạo một file `AGENTS.md` (hoặc `CLAUDE.md`) ở gốc repo, gồm: tổng quan và mục đích
+dự án, stack và phiên bản, lệnh chạy lần đầu, các ràng buộc cứng không được vi phạm, và link tới tài
+liệu chi tiết. [Bài 04](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-04-why-one-giant-instruction-file-fails/index.md) thêm quy tắc kích cỡ: khoảng 100 dòng, là một *trang mục lục*, không
+phải bách khoa; chi tiết tách ra `docs/` để agent đọc khi cần. [Bài 01](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-01-why-capable-agents-still-fail/index.md) thêm thứ quan trọng
+nhất trong tờ giấy: một *định nghĩa xong* kiểm được bằng lệnh, kiểu "endpoint `GET /api/search?q=`,
+phân trang 20, pass `pytest` và `mypy --strict`", thay cho câu "thêm tìm kiếm". Lỗi chặn được: hai
+lỗi hàng đầu của bài 01, yêu cầu mơ hồ và quy ước ngầm chưa viết ra. Khoá học còn nói một câu đáng
+ghim: một file `AGENTS.md` có thể hiệu quả hơn nâng cấp lên model đắt hơn.
 
-Chứa: system prompt, file chỉ dẫn ở gốc repo (`AGENTS.md` hay `CLAUDE.md`), và một *định nghĩa
-xong* kiểm được bằng lệnh. Chặn: hai lỗi hàng đầu trong bài 01 của khoá học là yêu cầu mơ hồ (agent
-chỉ còn cách đoán) và convention không được viết ra (agent không thể tuân cái nó chưa từng thấy).
-Ví dụ: thay "thêm tìm kiếm" bằng "endpoint `GET /api/search?q=`, phân trang 20, pass `pytest` và
-`mypy --strict`". Khoá học nhấn mạnh ở bài 04: một file khổng lồ phản tác dụng; giữ `AGENTS.md`
-khoảng 100 dòng như một trang mục lục, chi tiết để trong `docs/` cho agent đọc khi cần. Bài
-[context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
-của Anthropic gọi đây là "độ cao đúng" của prompt: đủ cụ thể để dẫn hướng, đủ linh hoạt để model
-tự xử lý tình huống, không hardcode logic giòn.
+### Tools: bộ dụng cụ, vừa đủ và có nhãn
 
-### Tools: hợp đồng giữa hệ xác định và agent bất định
+Đây là bộ dụng cụ trên bàn. Thợ giỏi mà không có tuốc-nơ-vít thì chỉ đứng nhìn; đưa cả thùng dụng
+cụ lẫn lộn không nhãn thì cầm nhầm.
 
-Đây là bộ dụng cụ trên bàn. Thợ giỏi mà không có tuốc-nơ-vít thì chỉ đứng nhìn; có cả thùng dụng
-cụ lẫn lộn không nhãn thì cầm nhầm. Tool cũng cần tên và mô tả rõ như nhãn trên từng dụng cụ.
-
-Chứa: các tool, mô tả, schema tham số, và cách chúng được bày ra (có thể qua MCP, như [bài 5](#/blog/mcp-model-context-protocol)).
-Chặn: agent không có cách làm việc, hoặc có quá nhiều tool chồng lấn nên chọn sai. Bài
+Bài 02 đặt hai vế cho hệ con này. Vế một: cho agent *đủ* quyền dùng tool; đừng tắt shell "cho an
+toàn", vì agent không chạy được cả `pip install` thì làm gì được. Vế hai: cũng không mở hết, mà
+theo nguyên tắc tối thiểu đặc quyền. Với coding agent, danh sách tool của khoá học là shell, đọc
+ghi file, git, cùng startup script và lệnh test. Lỗi chặn được: agent "muốn làm mà không làm được",
+hoặc có quá nhiều tool chồng lấn nên chọn sai. Bài
 [Writing effective tools for agents](https://www.anthropic.com/engineering/writing-tools-for-agents)
-của Anthropic định nghĩa tool là "hợp đồng giữa hệ xác định và agent bất định", và rút ra vài quy
-tắc: ít tool nhưng trúng workflow thay vì bọc từng endpoint; `search_contacts` tốt hơn
-`list_contacts` vì context có hạn; trả về thông tin giàu tín hiệu (bỏ UUID, bỏ mime type); có
-tham số `response_format` để model chọn bản gọn hay bản đầy đủ; thông điệp lỗi phải nói *sửa thế
-nào*, không chỉ "sai". Khoá học bổ sung nguyên tắc tối thiểu đặc quyền: không tắt shell "cho an
-toàn" khiến agent không cài được gì, nhưng cũng không mở hết.
+của Anthropic bổ sung phần "nhãn": mô tả tool phải viết như brief cho người mới, trả về thông tin
+giàu tín hiệu, và báo lỗi phải nói cách sửa.
 
-### Environment: môi trường tự mô tả
+### Environment: cái xưởng tự mô tả
 
 Đây là cái xưởng: máy có điện chưa, phần mềm đúng phiên bản chưa, cửa nào được mở. Xưởng hỏng thì
 thợ mất cả buổi sửa xưởng thay vì làm việc được giao.
 
-Chứa: nơi agent chạy, phiên bản runtime, dependency bị khoá, dữ liệu mẫu, và giới hạn (mạng, thời
-gian, bộ nhớ). Chặn: agent đốt context window vào `pip install` lỗi và xung đột phiên bản thay vì
-làm việc chính. Ví dụ từ bài 06: tách *initialization* thành pha riêng với `init.sh` (cài, kiểm
-tra, khởi động) và một checklist "sẵn sàng" gồm bốn điều: chạy được, test được, thấy tiến độ, biết
-bước tiếp. Với agent nghiên cứu, environment còn là allow-list domain được fetch và giới hạn kích
-cỡ trang, để một trang web độc không biến thành prompt injection chiếm quyền agent.
+Khoá học yêu cầu môi trường *tự mô tả*: khoá dependency bằng `pyproject.toml` hay `package.json`,
+ghim phiên bản runtime bằng `.python-version` hay `.nvmrc`, và dùng Docker hoặc devcontainer để
+dựng lại y hệt ở bất cứ đâu. [Bài 06](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-06-why-initialization-needs-its-own-phase/index.md) tách *khởi tạo* thành pha riêng, với `init.sh` (cài,
+kiểm tra, khởi động) và một checklist sẵn sàng gồm bốn điều: chạy được, test được, thấy tiến độ,
+biết bước tiếp. Codex, theo bài 02, còn tách mỗi task ra một git worktree riêng để các thay đổi
+không dẫm lên nhau. Lỗi chặn được: agent đốt context window vào lỗi cài đặt và xung đột phiên bản.
+Với agent nghiên cứu, xưởng còn gồm danh sách domain được phép tải và giới hạn kích cỡ trang, để một
+trang web lạ không chiếm quyền agent.
 
-### Context: tài nguyên hữu hạn, lợi suất giảm dần
+### State: cuốn sổ và cái tủ
 
-Context là những gì model đang "nhìn thấy" lúc này, giống một cái bàn làm việc chỉ rộng có hạn.
-Chất đầy giấy lên bàn thì tờ quan trọng bị vùi mất. Harness phải dọn bàn: cất giấy cũ vào tủ, chỉ
-để lại thứ cần ngay.
+Nếu context (những gì model đang "nhìn thấy") là mặt bàn, thì state là cuốn sổ và cái tủ: đã làm
+gì, đang làm gì, còn gì, ghi ra ngoài để ca sau mở ra đọc. Không có sổ, mỗi ca làm việc mới bắt
+đầu như chưa từng có ca trước.
 
-Chứa: chính sách về *cái gì nằm trong context window ở mỗi bước*. Chặn: *context rot*, hiện tượng
-model nhớ kém dần khi context dài ra, và chuyện agent "hết hơi" giữa việc. Anthropic coi context là
-ngân sách chú ý hữu hạn; mục tiêu là *tập token nhỏ nhất mà tín hiệu cao nhất*. Ba kỹ thuật cho
-việc dài: **compaction** (tóm tắt lịch sử, giữ quyết định kiến trúc, bug chưa xong, chi tiết
-triển khai; bỏ output tool thừa; cách nhẹ và an toàn nhất là xoá kết quả tool cũ), **ghi chú có
-cấu trúc** (agent tự viết `NOTES.md` ngoài context rồi đọc lại), và **sub-agent** (mỗi việc con
-chạy trong context sạch, trả về bản tóm tắt 1-2 nghìn token). Khi mổ xẻ Claude Code, khoá học
-cho thấy nó dùng một pipeline nén nhiều tầng: cắt không mất mát trước, chưng cất có cấu trúc sau,
-tóm tắt bằng LLM cuối cùng, có cầu chì chống nén quá tay.
+Thứ cụ thể khoá học bảo tạo ở bài 02 là một file `PROGRESS.md` đơn giản với ba mục: đã xong, đang
+làm, bị chặn; cập nhật trước khi kết thúc phiên, đọc khi mở phiên mới. [Bài 05](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-05-why-long-running-tasks-lose-continuity/index.md) mở rộng
+thành bộ ba: file tiến độ, nhật ký quyết định, và commit git làm điểm khôi phục, với một chỉ số để
+đo: *chi phí dựng lại*, tức thời gian phiên mới cần để làm việc được. [Bài 08](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-08-why-feature-lists-are-harness-primitives/index.md) thêm danh sách
+feature máy đọc được, mỗi mục là bộ ba (mô tả hành vi, lệnh kiểm chứng, trạng thái), và trạng thái
+chỉ chuyển sang `passing` khi lệnh kiểm chứng chạy qua. Lỗi chặn được: mất liên tục giữa các phiên,
+làm lại việc đã xong, hoặc "nhìn quanh thấy có tiến độ rồi tuyên bố xong cả dự án".
 
-### State: bộ nhớ sống ngoài context
+Quản lý context trong một phiên cũng thuộc hệ con này, vì cùng là chuyện "giữ cái gì, bỏ cái gì".
+Khi mổ xẻ [Claude Code](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/harness-designs/claude-code/index.md), khoá học cho thấy nó nén context theo nhiều tầng: cắt không mất mát
+trước (xoá kết quả tool thừa), chưng cất có cấu trúc sau, tóm tắt bằng LLM cuối cùng, có cầu chì
+chống nén quá tay. Bài
+[context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
+của Anthropic nêu cùng ba kỹ thuật cho việc dài: compaction, ghi chú có cấu trúc ngoài context, và
+sub-agent trả về bản tóm tắt.
 
-Nếu context là cái bàn thì state là cuốn sổ và cái tủ: đã làm gì, đang làm gì, còn gì, ghi ra ngoài
-để ca sau mở ra đọc. Không có sổ, mỗi ca làm việc mới bắt đầu như chưa từng có ca trước.
+### Feedback: người chấm bài, tách khỏi người làm bài
 
-Chứa: file tiến độ, danh sách việc có trạng thái, lịch sử git, tài liệu bàn giao. Chặn: mất liên
-tục giữa các phiên, làm lại việc đã xong, hoặc "nhìn quanh thấy có tiến độ rồi tuyên bố xong việc
-cả dự án" (một thất bại Anthropic ghi lại nguyên văn). Ví dụ từ Anthropic: một `init.sh`, một
-`claude-progress.txt` ghi những gì đã làm, một `feature_list.json` hơn 200 feature khởi đầu đều
-`failing`, agent chỉ được lật trường `passes`, và cấm xoá hay sửa test. Họ chọn JSON thay Markdown
-vì model ít tự ý sửa JSON hơn. Khoá học (bài 08) gọi mỗi mục trong danh sách là một bộ ba
-*(mô tả hành vi, lệnh kiểm chứng, trạng thái)*, và quy định trạng thái chỉ đổi sang `passing` khi
-lệnh kiểm chứng chạy qua, do harness thực hiện, không phải do agent tự ghi.
+Đây là người chấm bài. Tự chấm bài mình thì ai cũng thấy mình đúng, agent cũng vậy. "Xong" phải
+được chứng minh bằng một bài kiểm tra chạy được, không phải bằng cảm giác.
 
-### Scope: một việc một lúc
-
-Đây là quy tắc "một việc một lúc". Ai từng mở năm việc cùng lúc đều biết kết cục: cái nào cũng dở.
-Agent y hệt, chỉ khác là nó làm dở nhanh hơn.
-
-Chứa: giới hạn số việc đang mở (WIP, work in progress) và ranh giới của mỗi việc, ghi thành file.
-Chặn: cặp lỗi song sinh bài 07 gọi là *overreach* (làm quá) và *under-finish* (dang dở). Ví dụ:
-Anthropic yêu cầu coding agent chỉ làm một feature mỗi phiên và thấy đây là điểm mấu chốt chống xu
-hướng "làm một phát hết cả app". Khoá học đo được: cùng tám feature, chế độ tự do để lại ba cái
-làm dở; chế độ WIP=1 sau bốn phiên xong bảy. Dòng code và tỉ lệ hoàn thành tỉ lệ nghịch.
-
-### Verification: tự tin không phải là đúng
-
-Đây là người chấm bài, tách khỏi người làm bài. Tự chấm bài mình thì ai cũng thấy mình đúng, agent
-cũng vậy. "Xong" phải được chứng minh bằng một bài kiểm tra chạy được, không phải bằng cảm giác.
-
-Chứa: lệnh kiểm chứng, checker tự động, và một evaluator *tách khỏi* người làm. Chặn: lỗi phổ
-biến nhất, *tuyên bố thắng sớm*. Bài 09 gọi đây là verification gap, khoảng cách giữa độ tự tin
-của agent và độ đúng thật, và đề xuất ba lớp: cú pháp qua, hành vi qua (test chạy, app khởi động),
-hệ thống qua (end-to-end). Anthropic rút ra bài học tương tự theo cách đau hơn: unit test và `curl`
-đều qua nhưng app vỡ khi dùng thật; chỉ khi bắt agent dùng browser automation "test như người dùng"
-kết quả mới cải thiện rõ. Và vì generator có xu hướng tự khen, họ tách evaluator riêng, kèm ngưỡng
-cứng cho từng tiêu chí. Bài 13 của khoá học nâng điều này thành nguyên tắc: *maker và checker phải
-tách nhau*, đôi khi là hai model khác nhau.
-
-### Observability: không thấy thì không sửa
-
-Đây là camera và sổ nhật ký của xưởng: ai làm gì lúc nào, tốn bao nhiêu, kết quả ra sao. Không có
-nó, khi hỏng bạn chỉ biết "nó hỏng", không biết sửa chỗ nào.
-
-Chứa: trace từng bước (gọi tool gì, với input nào, tốn bao nhiêu token), log runtime, rubric chấm,
-và bộ eval. Chặn: retry mù, đánh giá cảm tính, và bàn giao mất thông tin. Bài 11 chia hai lớp:
-*runtime observability* trả lời "hệ thống đã làm gì" và *process observability* trả lời "vì sao
-thay đổi này nên được chấp nhận" (sprint contract, rubric). Bài
+Bài 02 gọi đây là hệ con có *lợi suất đầu tư cao nhất*, và việc cụ thể rất rẻ: liệt kê thẳng các
+lệnh kiểm chứng trong `AGENTS.md` (test, type-check, lint, và một lệnh chạy tất cả). [Bài 09](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-09-why-agents-declare-victory-too-early/index.md)
+xếp kiểm chứng thành ba lớp phải qua lần lượt: cú pháp, hành vi (test chạy, app khởi động), hệ
+thống (end-to-end). [Bài 10](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-10-why-end-to-end-testing-changes-results/index.md) cho thấy test end-to-end không chỉ bắt lỗi mà còn đổi cách
+agent viết code, và quy tắc kiến trúc phải *chạy được* chứ không nằm trong tài liệu. [Bài 13](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-13-loop-engineering/index.md)
+nâng thành nguyên tắc: *maker và checker phải tách nhau*, đôi khi là hai model khác nhau. Log và
+trace cũng nằm ở đây: bài 02 kể Codex đi kèm cả bộ quan sát (log, metric, trace) để mỗi thay đổi
+được kiểm trong môi trường riêng, và [bài 11](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-11-why-observability-belongs-inside-the-harness/index.md) chia quan sát thành hai lớp, runtime (hệ thống
+đã làm gì) và process (vì sao thay đổi này nên được chấp nhận: sprint contract, rubric chấm). Lỗi
+chặn được: lỗi phổ biến nhất, *tuyên bố thắng sớm*. Bài
 [Demystifying evals for AI agents](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)
-cho vốn từ: *task* (một ca kiểm thử), *trial* (một lần chạy), *grader* (logic chấm), *transcript*
-(toàn bộ diễn biến), *outcome* (trạng thái cuối của môi trường, không phải lời agent nói). Lời
-khuyên đáng giá nhất: chấm *kết quả*, không chấm *đường đi*; dùng grader bằng code khi có thể,
-LLM khi cần, người khi thật quan trọng; và không tin số liệu cho đến khi đã đọc transcript. Cũng
-không cần đợi: 20 đến 50 task lấy từ lỗi thật là một khởi đầu tốt.
+của Anthropic bổ sung vốn từ để đo: task, trial, grader, transcript, outcome; chấm kết quả chứ
+không chấm đường đi; và pass^k để đo độ ổn định.
 
-Cuối cùng là cách *chọn* thành phần: giữ model cố định, bỏ từng thành phần một, xem cái nào gây tụt
-nhiều nhất. Khoá học kể một team dùng cùng GPT-4o cho dự án React 20 nghìn dòng: chỉ README, 1 trong
-5 lần chạy thành công; thêm `AGENTS.md`, 60%; thêm lệnh kiểm chứng, 80%; thêm file tiến độ, ổn
-định 80 đến 100%. Bốn vòng, không đổi model. Nhưng ablation chỉ nói "cái nào đang có giá nhất",
-không nói "nút thắt ở đâu"; muốn biết điều đó bạn phải đọc log lỗi và quy từng lỗi về một lớp.
+### Hai kỷ luật vận hành: Scope và Session lifecycle
+
+[README](https://github.com/walkinglabs/learn-harness-engineering#what-harness-engineering-actually-means) của khoá học kể năm hệ con theo một cách khác, nhìn từ *việc harness phải làm*:
+Instructions, State, Verification, Scope, Session Lifecycle. Ba cái đầu trùng với bài 02 (Verification
+chính là Feedback). Hai cái còn lại không phải lớp kỹ thuật mới, mà là hai kỷ luật vận hành đặt lên
+trên năm lớp kia.
+
+**Scope.** Đây là quy tắc "một việc một lúc". Ai từng mở năm việc cùng lúc đều biết kết cục: cái
+nào cũng dở. Agent y hệt, chỉ khác là nó làm dở nhanh hơn. README nói: giới hạn agent ở một feature
+mỗi lần, không làm quá, không làm dở ba việc, không sửa danh sách feature để giấu việc chưa xong.
+[Bài 07](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-07-why-agents-overreach-and-under-finish/index.md) gọi đây là WIP=1 (chỉ một việc đang mở) và chỉ ra cặp lỗi song sinh *overreach* (làm
+quá) và *under-finish* (dang dở); khoá học đo được với cùng tám feature, chế độ tự do để lại ba cái
+làm dở, chế độ WIP=1 sau bốn phiên xong bảy. Ranh giới của việc phải nằm trong file, và file đó
+chính là danh sách feature của bài 08.
+
+**Session lifecycle.** Đây là thủ tục đầu ca và cuối ca. Đầu ca: đọc tờ chỉ dẫn, chạy `init.sh`,
+đọc sổ tiến độ, xem danh sách việc, xem lịch sử git, rồi chọn *một* việc. Cuối ca: cập nhật sổ, cập
+nhật danh sách việc, ghi lại cái gì còn hỏng, commit khi an toàn, và để lại đường khởi động sạch cho
+ca sau. [Bài 12](https://github.com/walkinglabs/learn-harness-engineering/blob/main/docs/en/lectures/lecture-12-why-every-session-must-leave-a-clean-state/index.md) định nghĩa "trạng thái sạch" bằng năm điều kiện không được thiếu cái nào:
+build qua, test qua, tiến độ đã ghi, không còn file tạm, và có đường khởi động. Thiếu một, phiên coi
+như chưa xong.
+
+| README (việc phải làm) | Bài 02 (lớp kỹ thuật) | Ghi chú |
+|---|---|---|
+| Instructions | Instructions | trùng |
+| State | State | trùng; context trong phiên cũng ở đây |
+| Verification | Feedback | cùng một thứ, hai tên |
+| Scope | (kỷ luật trên State) | WIP=1, feature list là ranh giới |
+| Session Lifecycle | (kỷ luật trên Environment và State) | init đầu phiên, clean state cuối phiên |
+| | Tools, Environment | README gộp vào "môi trường làm việc" |
+
+Cuối cùng là cách *chọn* thành phần cần đầu tư, cũng từ bài 02. Thứ nhất, kiểm định năm phần: chấm
+mỗi hệ con từ 1 đến 5, lấy phần thấp nhất ra sửa 30 phút rồi xem agent đổi thế nào. Thứ hai, loại
+trừ từng phần: giữ model cố định, bỏ từng hệ con một, xem bỏ cái nào làm tụt nhiều nhất. Khoá học
+kể một team dùng cùng GPT-4o cho dự án React 20 nghìn dòng: chỉ README, 1 trong 5 lần chạy thành
+công; thêm `AGENTS.md`, 60%; thêm lệnh kiểm chứng, 80%; thêm file tiến độ, ổn định 80 đến 100%.
+Bốn vòng, không đổi model. Nhưng loại trừ chỉ nói "cái nào đang có giá nhất", không nói "nút thắt ở
+đâu"; muốn biết điều đó bạn phải đọc log lỗi và quy từng lỗi về một lớp.
 
 ## Case thực tế: research agent có harness đầy đủ
 
@@ -261,114 +251,125 @@ nào*, và *khi nào được gọi là xong*.
 
 Thiết kế dưới đây giả định gọi thẳng API của model qua SDK chính thức và tự viết vòng lặp, để mọi
 thành phần harness lộ ra thay vì ẩn trong framework; phần tool có thể bọc MCP. Nếu bạn dùng LangGraph như [bài 4](#/blog/langgraph-ai-agents), mỗi ô
-trong sơ đồ thành một node và state của graph thay cho `progress.json`; các thành phần harness vẫn
+trong sơ đồ thành một node và state của graph thay cho `PROGRESS.md` và `questions.json`; các thành phần harness vẫn
 y nguyên, chỉ đổi chỗ đứng.
 
 ```text
 research-agent/
-├── AGENTS.md                 # bản đồ cho agent: mục tiêu, quy tắc trích dẫn, lệnh kiểm
-├── config.yaml               # model, ngân sách, ngưỡng nén, allow-list domain
-├── run.py                    # điểm vào: python run.py "câu hỏi" [--resume RUN_ID]
-├── agent/                    # phần "bộ não" dùng: vòng lặp và prompt
-│   ├── loop.py               # gọi model -> chạy tool -> ghi state, có điều kiện dừng
-│   ├── prompts/
-│   │   ├── system.md         # vai, quy trình plan-search-read-note-synthesize, format
-│   │   └── compaction.md     # prompt tóm tắt lịch sử: giữ gì, bỏ gì
-│   └── report_schema.py      # cấu trúc báo cáo: đoạn + [n] + danh sách nguồn
-├── tools/                    # những gì agent có thể làm (bọc MCP được)
-│   ├── registry.py           # danh bạ tool: tên, mô tả, schema, hàm, cờ chỉ-đọc/mạng
-│   ├── search.py             # tìm web: lọc domain, trả title+url+snippet gọn
+├── AGENTS.md                 # [Instructions] bản đồ ~100 dòng: mục đích, quy tắc, kiểm
+├── docs/
+│   ├── report-format.md      # [Instructions] báo cáo xong trông thế nào: định nghĩa xong
+│   └── source-policy.md      # [Instructions] nguồn nào được tính, trích dẫn ra sao
+├── init.sh                   # [Lifecycle] cài, kiểm key, chạy thử một search, in tiến độ
+├── pyproject.toml            # [Environment] khoá dependency và phiên bản Python
+├── .devcontainer/            # [Environment] dựng lại y hệt; allow-list mạng
+├── config.yaml               # [Environment] model, ngân sách, ngưỡng nén, domain
+├── agent/
+│   ├── loop.py               # vòng lặp: gọi model -> chạy tool -> ghi state -> xét dừng
+│   └── prompts/
+│       ├── system.md         # [Instructions] vai và quy trình model đọc mỗi lượt
+│       └── compaction.md     # [State] bản tóm tắt lịch sử phải giữ gì, bỏ gì
+├── tools/                    # [Tools] tối thiểu đặc quyền: cờ chỉ-đọc / có mạng
+│   ├── registry.py           # danh bạ tool: tên, mô tả, schema, cờ quyền
+│   ├── search.py             # tìm trong domain được phép: tiêu đề + URL + trích
 │   ├── fetch.py              # tải trang -> text sạch, cắt theo giới hạn, lưu bản gốc
-│   ├── notes.py              # ghi và đọc lại ghi chú có cấu trúc: claim, quote, url
-│   ├── submit_report.py      # nộp báo cáo: chạy verifier, trả lỗi để model sửa
+│   ├── notes.py              # ghi và đọc lại ghi chú: claim, quote, url
+│   ├── submit_report.py      # [Feedback] nộp cho checker; đường duy nhất tới "xong"
 │   └── mcp_server.py         # bày các tool trên qua MCP cho agent khác dùng lại
-├── harness/                  # những gì quản vòng lặp, không phụ thuộc model
-│   ├── context.py            # nén context: xoá tool_result cũ, rồi tóm tắt nếu vẫn dài
-│   ├── state.py              # progress.json + notes.md: load, save, resume, handoff
-│   ├── policy.py             # cổng quyền: tool nào, domain nào, bao nhiêu lần
-│   ├── sandbox.py            # giới hạn mạng/thời gian/kích cỡ cho fetch
-│   ├── budget.py             # đếm token, số bước, tiền; quyết định dừng
-│   ├── tracing.py            # trace.jsonl: mỗi bước, mỗi tool call, usage, verdict
-│   └── verifiers/
-│       ├── citations.py      # mọi claim có [n]; mọi [n] trỏ tới URL đã fetch
+├── harness/
+│   ├── policy.py             # [Tools] cổng quyền: tool nào, domain nào, bao nhiêu lần
+│   ├── context.py            # [State] nén context: xoá kết quả cũ, rồi tóm tắt
+│   ├── budget.py             # [Lifecycle] đếm bước, token; quyết định dừng
+│   ├── handoff.py            # [Lifecycle] kiểm trạng thái sạch, viết bàn giao
+│   ├── tracing.py            # [Feedback] trace.jsonl: mỗi bước, tool call, kết quả
+│   └── verifiers/            # [Feedback] checker tách khỏi model, code thuần
+│       ├── citations.py      # mọi số liệu có [n]; mọi [n] trỏ tới URL đã fetch
 │       └── structure.py      # đủ mục, đủ số nguồn tối thiểu, không đoạn trống
-├── evals/
-│   ├── tasks.jsonl           # 30 câu hỏi từ lỗi thật + tiêu chí chấm
-│   ├── graders.py            # grader bằng code (domain phải có, claim phải có nguồn)
-│   └── run_evals.py          # chạy k lần, báo pass@k và pass^k, lưu transcript
+├── evals/                    # [Feedback] 30 câu hỏi từ lỗi thật; k lần, pass^k
+│   ├── tasks.jsonl
+│   └── run_evals.py
 └── runs/
     └── 2026-10-28_harness-evidence/
-        ├── progress.json     # bước hiện tại, plan, URL đã mở, trạng thái
-        ├── notes.md          # ghi chú agent tự viết, đọc lại sau khi nén
-        ├── sources/          # bản gốc từng trang, để verifier đối chiếu quote
-        ├── trace.jsonl       # trace của lần chạy
-        └── report.md         # báo cáo cuối, chỉ tồn tại khi verifier đã qua
+        ├── PROGRESS.md       # [State] đã xong / đang làm / bị chặn / bước tiếp
+        ├── questions.json    # [Scope] câu hỏi con + trạng thái; một active một lúc
+        ├── notes.md          # [State] ghi chú agent tự viết, đọc lại sau khi nén
+        ├── sources/          # [State] bản gốc từng trang, để checker đối chiếu
+        ├── trace.jsonl       # [Feedback] trace của lần chạy
+        └── report.md         # chỉ tồn tại khi checker đã qua
 ```
 
-Hai thư mục `agent/` và `tools/` là phần người đọc quen thấy trong mọi demo. Thư mục `harness/`
-là phần làm nên khác biệt giữa demo và hệ thống, và nó không import gì từ model: thay model, đổi
-framework, `harness/` vẫn dùng được. `evals/` và `runs/` là bằng chứng: không có chúng, bạn chỉ có
-cảm giác.
+Nhãn trong ngoặc vuông là hệ con của khoá học mà mỗi phần thuộc về. Đọc theo nhãn, bạn thấy đủ
+năm lớp của bài 02 (Instructions, Tools, Environment, State, Feedback) và hai kỷ luật của README
+(Scope qua `questions.json`, Lifecycle qua `init.sh`, `budget.py`, `handoff.py`). Hai thư mục
+`agent/` và `tools/` là phần người đọc quen thấy trong mọi demo. Thư mục `harness/` là phần làm nên
+khác biệt giữa demo và hệ thống, và nó không import gì từ model: thay model, đổi framework,
+`harness/` vẫn dùng được. `evals/` và `runs/` là bằng chứng: không có chúng, bạn chỉ có cảm giác.
 
 ### Đi một câu hỏi qua hệ thống
 
-Chạy `python run.py "Có bằng chứng đo lường nào cho thấy đổi harness, không đổi model, làm thay đổi
-kết quả của agent?"`. `state.py` tạo thư mục run, `progress.json` với `step: 0`, và tracer mở
-`trace.jsonl`. Bước 0, model nhận system prompt (từ `system.md`, kèm trạng thái rút gọn từ
-`progress.json`) và lập kế hoạch: ba câu hỏi con (thí nghiệm có đối chứng cùng model, benchmark
-trước/sau khi đổi harness, nghiên cứu ablation) và các loại nguồn ưu tiên (blog kỹ thuật của
-vendor, repo, paper). Kế hoạch ghi vào `progress.json`; từ giờ nó là thứ model đọc lại sau mỗi
-lần nén context.
+**Đầu ca (Lifecycle).** Bạn chạy `init.sh`: nó cài dependency theo lockfile, kiểm tra key, chạy thử
+một lần search để chắc mạng và allow-list hoạt động, rồi in trạng thái. Sau đó khởi động agent với
+câu hỏi. Vòng lặp làm đúng thủ tục đầu ca của README: đọc `AGENTS.md`, tạo thư mục run với
+`PROGRESS.md` trống và `questions.json` trống, mở `trace.jsonl`.
 
-Bước 1 đến 4, model gọi `search` với từng câu hỏi con. Mỗi lời gọi đi qua `policy.py`: `search`
-là read-only và được phép, nhưng kết quả bị lọc theo allow-list domain trong `config.yaml`. Tool
-trả về tối đa tám kết quả, mỗi kết quả chỉ có tiêu đề, URL, một đoạn trích; không HTML, không
-metadata thừa. Model chọn ba URL để đọc và gọi `fetch`. `sandbox.py` giới hạn 200 KB và 15 giây
-mỗi trang, lưu bản gốc vào `sources/`, trả về text sạch đã cắt, kèm một dòng "đã cắt ở 60%, dùng
-`offset` để đọc tiếp" nếu trang dài. Đọc xong một trang, model gọi `write_note` với ba trường:
-claim (một câu), quote (nguyên văn, ngắn), url. `notes.py` ghi vào `notes.md` và đánh dấu URL đó
-là đã đọc trong `progress.json`.
+**Lập kế hoạch (Instructions, Scope).** Bước 0, model nhận system prompt (vai, quy trình, format
+báo cáo từ `docs/report-format.md`) và viết kế hoạch: ba câu hỏi con (thí nghiệm có đối chứng cùng
+model, benchmark trước và sau khi đổi harness, nghiên cứu loại trừ từng phần) và loại nguồn ưu tiên.
+Harness ghi ba câu hỏi con vào `questions.json`, mỗi câu kèm trạng thái và tiêu chí xong ("ít nhất
+hai nguồn đã fetch, có ghi chú"), đúng kiểu bộ ba của bài 08. Chỉ một câu được đánh `active`. Đây là
+WIP=1 của bài 07 áp vào nghiên cứu: model không được tìm cho cả ba câu cùng lúc.
 
-Bước 12, `budget.py` báo context ước tính đã vượt ngưỡng 120 nghìn token. `context.py` làm hai
-việc theo thứ tự: trước hết xoá nội dung các `tool_result` cũ (giữ sáu kết quả gần nhất), vì đó là
-cách nén nhẹ tay và an toàn nhất; đo lại, nếu vẫn dài thì gọi model với `compaction.md` để tóm tắt
-phần lịch sử cũ thành một đoạn, giữ đúng những gì prompt yêu cầu: kế hoạch, câu hỏi con đã đóng,
-nguồn đã đọc và chưa đọc, nghi vấn chưa giải quyết. Lịch sử mới gồm bản tóm tắt cộng vài lượt gần
-nhất. Agent không hoảng vì mất chi tiết: chi tiết nằm trong `notes.md`, nó có thể gọi tool ghi chú để đọc lại.
+**Tìm, đọc, ghi chú (Tools, Environment).** Bước 1 đến 4, model gọi `search` cho câu hỏi con đang
+active. Mỗi lời gọi đi qua cổng quyền: `search` là tool chỉ đọc, được phép, nhưng kết quả bị lọc theo
+domain trong `config.yaml`. Tool trả về tối đa tám kết quả, mỗi kết quả chỉ có tiêu đề, URL, một
+đoạn trích. Model chọn ba URL và gọi `fetch`; môi trường giới hạn 200 KB và 15 giây mỗi trang, lưu
+bản gốc vào `sources/`, trả về text sạch đã cắt kèm chỉ dẫn đọc tiếp nếu trang dài. Đọc xong, model
+gọi tool ghi chú với ba trường: claim (một câu), quote (nguyên văn, ngắn), url. Harness ghi vào
+`notes.md` và đánh dấu URL là *đã fetch*. Khi câu hỏi con đạt tiêu chí, harness (không phải model)
+chuyển nó sang `passing` trong `questions.json` và mở câu tiếp theo.
 
-Bước 20, model thấy ba câu hỏi con đều có ít nhất hai nguồn và viết bản nháp, rồi gọi
-`submit_report`. Đây là chỗ harness tỏ rõ ý đồ: nộp báo cáo *là một tool*, và tool đó chạy
-`verifiers/`. `citations.py` thấy đoạn ba có một con số không kèm `[n]`, và `[4]` trỏ tới một URL
-có trong kết quả search nhưng chưa từng được `fetch`. Tool trả về một kết quả lỗi với hai dòng
-nói đích danh đoạn nào, URL nào, và cách sửa ("fetch URL rồi ghi chú, hoặc bỏ claim"). Model
-fetch trang đó, ghi chú, sửa bản nháp, nộp lại ở bước 23. Verifier qua, `report.md` được ghi,
-`progress.json` chuyển `done: true`, vòng lặp dừng.
+**Nén context (State).** Bước 12, bộ đếm báo context ước tính đã vượt ngưỡng 120 nghìn token. Harness
+làm hai việc theo thứ tự: xoá nội dung các kết quả tool cũ (giữ sáu kết quả gần nhất), vì đó là cách
+nén nhẹ và an toàn nhất; đo lại, nếu vẫn dài thì gọi model với `compaction.md` để tóm tắt phần lịch
+sử cũ, giữ đúng những gì file đó yêu cầu: kế hoạch, câu hỏi con đã đóng, nguồn đã đọc và chưa đọc,
+nghi vấn chưa giải quyết. Agent không hoảng vì mất chi tiết: chi tiết nằm trong `notes.md` và
+`questions.json`, nó đọc lại được.
 
-Nếu ở bước 23 ngân sách 40 bước hoặc 400 nghìn token cạn trước, `loop.py` không cố nộp một báo cáo
-chưa kiểm; nó ghi một mục bàn giao vào `progress.json` (đang ở đâu, thiếu gì, bước tiếp là gì) và
-thoát với mã lỗi. Lần sau chạy `--resume` sẽ đọc tiến độ, ghi chú và danh sách nguồn, bắt đầu từ
-bước 23 chứ không phải bước 0. Suốt quá trình, `trace.jsonl` có một dòng cho mỗi bước và mỗi tool
-call; `run_evals.py` chạy lại câu hỏi này cùng 29 câu khác ba lần mỗi câu và báo pass^3, con số
-cho biết hệ thống *ổn định* đến đâu chứ không chỉ "có lúc đúng".
+**Nộp và kiểm (Feedback).** Bước 20, cả ba câu hỏi con đã `passing`, model viết bản nháp và gọi
+`submit_report`. Đây là chỗ harness tỏ rõ ý đồ: nộp báo cáo *là một tool*, và tool đó chạy checker
+trong `verifiers/`. Checker trích dẫn thấy đoạn ba nêu một con số không kèm `[n]`, và `[4]` trỏ tới
+một URL có trong kết quả search nhưng chưa từng được fetch. Tool trả về một kết quả lỗi với hai dòng
+nói đích danh đoạn nào, URL nào, và cách sửa ("fetch URL rồi ghi chú, hoặc bỏ claim"). Model fetch
+trang đó, ghi chú, sửa bản nháp, nộp lại ở bước 23. Checker qua, `report.md` được ghi.
+
+**Cuối ca (Lifecycle).** Trước khi thoát, `handoff.py` chạy kiểm trạng thái sạch theo năm điều kiện
+của bài 12, dịch sang agent nghiên cứu: báo cáo đã qua checker, `PROGRESS.md` đã cập nhật,
+`questions.json` khớp với thực tế, không còn file tạm trong `sources/`, và lệnh chạy lại hoạt động.
+Nếu ngân sách 40 bước hoặc 400 nghìn token cạn trước bước 23, vòng lặp không cố nộp một báo cáo chưa
+kiểm; nó ghi vào `PROGRESS.md` đang ở đâu, thiếu gì, bước tiếp là gì, và thoát với mã lỗi. Lần sau
+chạy lại với cùng run, agent đọc `PROGRESS.md`, `questions.json` và `notes.md`, bắt đầu từ bước 23
+chứ không phải bước 0. Suốt quá trình `trace.jsonl` có một dòng cho mỗi bước và mỗi tool call;
+`run_evals.py` chạy lại câu hỏi này cùng 29 câu khác ba lần mỗi câu và báo pass^3, con số cho biết
+hệ thống *ổn định* đến đâu chứ không chỉ "có lúc đúng".
 
 ### Bốn mảnh quyết định độ tin cậy
 
 Không cần đọc code để hiểu harness này. Chỉ cần biết từng mảnh làm gì, nằm ở đâu trong cây thư mục,
 và vì sao thiếu nó thì hệ thống trôi.
 
-| Mảnh | Nằm ở | Làm gì | Vì sao phải có |
-|---|---|---|---|
-| Vòng lặp | agent/loop.py | gọi model, chạy tool, ghi state, quyết định dừng | model không được tự tuyên bố xong |
-| Cổng quyền | harness/policy.py | duyệt từng lời gọi tool trước khi chạy | chặn domain lạ, tool cấm, gọi quá tay |
-| Verifier | harness/verifiers/ | soát báo cáo bằng code thuần | model tự chấm thì luôn thấy mình đúng |
-| Nén context | harness/context.py | dọn kết quả cũ, rồi tóm tắt | việc dài vượt quá một context window |
+| Mảnh | Nằm ở | Hệ con | Làm gì | Vì sao phải có |
+|---|---|---|---|---|
+| Vòng lặp | agent/loop.py | khung của cả harness | gọi model, chạy tool, ghi state, xét dừng | model không được tự tuyên bố xong |
+| Cổng quyền | harness/policy.py | Tools | duyệt từng lời gọi tool trước khi chạy | chặn domain lạ, tool cấm, gọi quá tay |
+| Checker | harness/verifiers/ | Feedback | soát báo cáo bằng code thuần | model tự chấm thì luôn thấy mình đúng |
+| Nén context | harness/context.py | State | dọn kết quả cũ, rồi tóm tắt | việc dài vượt quá một context window |
 
 **Vòng lặp.** Mỗi vòng làm đúng một chuỗi việc: kiểm ngân sách (số bước, số token) và dừng nếu cạn;
-nén context nếu đã vượt ngưỡng; gọi model với system prompt, bản rút gọn của `progress.json` và danh
+nén context nếu đã vượt ngưỡng; gọi model với system prompt, bản rút gọn của `PROGRESS.md` và `questions.json` cùng danh
 sách tool; nếu model gọi tool thì từng lời gọi đi qua cổng quyền rồi mới chạy, kết quả (kể cả lỗi,
-kèm lý do) được trả lại cho model; cuối vòng ghi `progress.json` để phiên sau tiếp tục được. Hai quyết
+kèm lý do) được trả lại cho model; cuối vòng ghi `PROGRESS.md` để phiên sau tiếp tục được. Hai quyết
 định thiết kế nằm ở đây. Thứ nhất, model ngừng nói không có nghĩa là xong: "xong" chỉ có một đường
-là `submit_report` chạy qua verifier; nếu model dừng mà chưa nộp, vòng lặp nhắc nó tiếp tục. Đây là
+là `submit_report` chạy qua checker; nếu model dừng mà chưa nộp, vòng lặp nhắc nó tiếp tục. Đây là
 *pass-state gating* của khoá học áp vào báo cáo thay vì feature. Thứ hai, tool bị từ chối vẫn nhận
 được câu trả lời có lý do, để model đổi hướng thay vì bị lặng lẽ bỏ qua. Khi ngân sách cạn, vòng lặp
 không cố nộp một báo cáo chưa kiểm; nó ghi bàn giao và thoát.

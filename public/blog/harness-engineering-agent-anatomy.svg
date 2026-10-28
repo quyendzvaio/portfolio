@@ -12,73 +12,75 @@
     <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
       <path d="M0,0 L10,5 L0,10 z" fill="#4ade80"/>
     </marker>
+    <marker id="arrow-muted" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9ba3c4"/>
+    </marker>
   </defs>
 
   <rect x="0" y="0" width="1200" height="760" rx="24" fill="#0b0d19"/>
 
   <text x="600" y="48" text-anchor="middle" font-size="26" font-weight="700" fill="#eef1ff">Agent = LLM + harness</text>
-  <text x="600" y="76" text-anchor="middle" font-size="16" fill="#9ba3c4">The model picks the next step. Everything else around it is the harness.</text>
+  <text x="600" y="76" text-anchor="middle" font-size="16" fill="#9ba3c4">Harness = Instructions + Tools + Environment + State + Feedback (lecture 02)</text>
 
-  <!-- top row: what the model sees and can do -->
-  <rect x="60" y="110" width="300" height="84" rx="14" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
-  <text x="210" y="146" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Instructions</text>
-  <text x="210" y="172" text-anchor="middle" font-size="15" fill="#9ba3c4">system prompt · AGENTS.md · done</text>
+  <!-- five subsystems of lecture 02 -->
+  <rect x="60" y="120" width="300" height="84" rx="14" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="210" y="156" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Instructions</text>
+  <text x="210" y="182" text-anchor="middle" font-size="15" fill="#9ba3c4">AGENTS.md map · definition of done</text>
 
-  <rect x="450" y="110" width="300" height="84" rx="14" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
-  <text x="600" y="146" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Tools</text>
-  <text x="600" y="172" text-anchor="middle" font-size="15" fill="#9ba3c4">search · fetch · notes · via MCP</text>
+  <rect x="450" y="120" width="300" height="84" rx="14" fill="#11142a" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="600" y="156" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Tools</text>
+  <text x="600" y="182" text-anchor="middle" font-size="15" fill="#9ba3c4">shell · files · git · just enough</text>
 
-  <rect x="840" y="110" width="300" height="84" rx="14" fill="#11142a" stroke="#f0b429" stroke-width="1.5"/>
-  <text x="990" y="146" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Context manager</text>
-  <text x="990" y="172" text-anchor="middle" font-size="15" fill="#9ba3c4">compaction · notes · sub-agents</text>
+  <rect x="840" y="120" width="300" height="84" rx="14" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
+  <text x="990" y="156" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Environment</text>
+  <text x="990" y="182" text-anchor="middle" font-size="15" fill="#9ba3c4">lockfiles · devcontainer · init.sh</text>
 
-  <!-- middle row -->
-  <rect x="60" y="338" width="300" height="84" rx="14" fill="#11142a" stroke="#f0b429" stroke-width="1.5"/>
-  <text x="210" y="374" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">State / memory</text>
-  <text x="210" y="400" text-anchor="middle" font-size="15" fill="#9ba3c4">progress.json · notes.md · git</text>
+  <rect x="60" y="345" width="300" height="84" rx="14" fill="#11142a" stroke="#f0b429" stroke-width="1.5"/>
+  <text x="210" y="381" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">State</text>
+  <text x="210" y="407" text-anchor="middle" font-size="15" fill="#9ba3c4">PROGRESS.md · feature list · git</text>
 
-  <rect x="420" y="325" width="360" height="110" rx="16" fill="#11142a" stroke="#a78bfa" stroke-width="2"/>
-  <text x="600" y="362" text-anchor="middle" font-size="26" font-weight="700" fill="#eef1ff">LLM</text>
-  <text x="600" y="390" text-anchor="middle" font-size="15" fill="#9ba3c4">model weights: decides the next step</text>
-  <text x="600" y="416" text-anchor="middle" font-size="15" fill="#a78bfa">loop: call → tools → observe → repeat</text>
+  <rect x="420" y="330" width="360" height="110" rx="16" fill="#11142a" stroke="#a78bfa" stroke-width="2"/>
+  <text x="600" y="367" text-anchor="middle" font-size="26" font-weight="700" fill="#eef1ff">LLM</text>
+  <text x="600" y="395" text-anchor="middle" font-size="15" fill="#9ba3c4">model weights: decides what to write</text>
+  <text x="600" y="421" text-anchor="middle" font-size="15" fill="#a78bfa">everything outside the weights is harness</text>
 
-  <rect x="840" y="338" width="300" height="84" rx="14" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
-  <text x="990" y="374" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Environment &amp; sandbox</text>
-  <text x="990" y="400" text-anchor="middle" font-size="15" fill="#9ba3c4">allow-list · limits · versions</text>
+  <rect x="840" y="345" width="300" height="84" rx="14" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="990" y="381" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Feedback</text>
+  <text x="990" y="407" text-anchor="middle" font-size="15" fill="#9ba3c4">verify commands · checker · traces</text>
 
-  <!-- bottom row -->
-  <rect x="60" y="566" width="300" height="84" rx="14" fill="#11142a" stroke="#ff3ddc" stroke-width="1.5"/>
-  <text x="210" y="602" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Permissions &amp; scope</text>
-  <text x="210" y="628" text-anchor="middle" font-size="15" fill="#9ba3c4">policy gate · one task at a time</text>
+  <!-- arrows: each subsystem feeds or constrains the model's next step -->
+  <line x1="300" y1="204" x2="470" y2="330" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+  <line x1="600" y1="204" x2="600" y2="330" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+  <line x1="900" y1="204" x2="730" y2="330" stroke="#ff3ddc" stroke-width="1.5" marker-end="url(#arrow-pink)"/>
+  <line x1="360" y1="387" x2="420" y2="387" stroke="#f0b429" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+  <line x1="840" y1="387" x2="780" y2="387" stroke="#4ade80" stroke-width="1.5" marker-end="url(#arrow-green)"/>
 
-  <rect x="450" y="566" width="300" height="84" rx="14" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
-  <text x="600" y="602" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Verification</text>
-  <text x="600" y="628" text-anchor="middle" font-size="15" fill="#9ba3c4">verifiers · tests · evaluator</text>
+  <!-- operational disciplines from the course README -->
+  <rect x="40" y="505" width="1120" height="150" rx="14" fill="none" stroke="#9ba3c4" stroke-width="1.5" stroke-dasharray="6 6"/>
 
-  <rect x="840" y="566" width="300" height="84" rx="14" fill="#11142a" stroke="#4ade80" stroke-width="1.5"/>
-  <text x="990" y="602" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Observability &amp; recovery</text>
-  <text x="990" y="628" text-anchor="middle" font-size="15" fill="#9ba3c4">trace.jsonl · evals · handoff</text>
+  <rect x="60" y="540" width="500" height="84" rx="14" fill="#11142a" stroke="#9ba3c4" stroke-width="1.5"/>
+  <text x="310" y="576" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Scope: one feature at a time</text>
+  <text x="310" y="602" text-anchor="middle" font-size="15" fill="#9ba3c4">feature list is the boundary · WIP = 1</text>
 
-  <!-- arrows: each component feeds or constrains the model's next step -->
-  <line x1="300" y1="194" x2="470" y2="325" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
-  <line x1="600" y1="194" x2="600" y2="325" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
-  <line x1="900" y1="194" x2="730" y2="325" stroke="#f0b429" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
-  <line x1="360" y1="380" x2="420" y2="380" stroke="#f0b429" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
-  <line x1="840" y1="380" x2="780" y2="380" stroke="#ff3ddc" stroke-width="1.5" marker-end="url(#arrow-pink)"/>
-  <line x1="300" y1="566" x2="470" y2="435" stroke="#ff3ddc" stroke-width="1.5" marker-end="url(#arrow-pink)"/>
-  <line x1="600" y1="566" x2="600" y2="435" stroke="#4ade80" stroke-width="1.5" marker-end="url(#arrow-green)"/>
-  <line x1="900" y1="566" x2="730" y2="435" stroke="#4ade80" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <rect x="640" y="540" width="500" height="84" rx="14" fill="#11142a" stroke="#9ba3c4" stroke-width="1.5"/>
+  <text x="890" y="576" text-anchor="middle" font-size="18" font-weight="600" fill="#eef1ff">Session lifecycle</text>
+  <text x="890" y="602" text-anchor="middle" font-size="15" fill="#9ba3c4">init.sh at start · clean state at end · handoff</text>
+
+  <text x="600" y="644" text-anchor="middle" font-size="15" fill="#9ba3c4">operational disciplines from the course README, laid on top of the five subsystems</text>
+
+  <line x1="310" y1="540" x2="520" y2="440" stroke="#9ba3c4" stroke-width="1.5" marker-end="url(#arrow-muted)"/>
+  <line x1="890" y1="540" x2="680" y2="440" stroke="#9ba3c4" stroke-width="1.5" marker-end="url(#arrow-muted)"/>
 
   <!-- legend -->
   <rect x="60" y="690" width="14" height="14" rx="3" fill="#22d3ee"/>
-  <text x="84" y="702" font-size="15" fill="#9ba3c4">model's inputs and tools</text>
-  <rect x="330" y="690" width="14" height="14" rx="3" fill="#f0b429"/>
-  <text x="354" y="702" font-size="15" fill="#9ba3c4">memory across steps</text>
-  <rect x="560" y="690" width="14" height="14" rx="3" fill="#ff3ddc"/>
-  <text x="584" y="702" font-size="15" fill="#9ba3c4">limits</text>
-  <rect x="680" y="690" width="14" height="14" rx="3" fill="#4ade80"/>
-  <text x="704" y="702" font-size="15" fill="#9ba3c4">feedback and evidence</text>
-  <rect x="930" y="690" width="14" height="14" rx="3" fill="#a78bfa"/>
-  <text x="954" y="702" font-size="15" fill="#9ba3c4">the model</text>
-  <text x="600" y="740" text-anchor="middle" font-size="15" fill="#9ba3c4">Arrows: what each part puts in front of the model, or enforces on its next step.</text>
+  <text x="84" y="702" font-size="15" fill="#9ba3c4">what the model reads and can do</text>
+  <rect x="380" y="690" width="14" height="14" rx="3" fill="#ff3ddc"/>
+  <text x="404" y="702" font-size="15" fill="#9ba3c4">where it runs</text>
+  <rect x="560" y="690" width="14" height="14" rx="3" fill="#f0b429"/>
+  <text x="584" y="702" font-size="15" fill="#9ba3c4">memory across sessions</text>
+  <rect x="820" y="690" width="14" height="14" rx="3" fill="#4ade80"/>
+  <text x="844" y="702" font-size="15" fill="#9ba3c4">evidence</text>
+  <rect x="960" y="690" width="14" height="14" rx="3" fill="#a78bfa"/>
+  <text x="984" y="702" font-size="15" fill="#9ba3c4">the model</text>
+  <text x="600" y="740" text-anchor="middle" font-size="15" fill="#9ba3c4">The model decides what to write. The harness governs when, where and how.</text>
 </svg>
