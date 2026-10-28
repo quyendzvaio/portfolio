@@ -10,7 +10,7 @@ that owns comments, admin login and the LLM call.
 | Blog posts | `src/content/<slug>.md` + `<slug>.vi.md`, committed to git | Bundled at build time. Add/edit/delete = commit, push, redeploy. |
 | Comments | Vercel Blob, one JSON object per comment | Via the backend. Anonymous; a thread on screen re-checks every 5–30 s. |
 | Admin login | `ADMIN_PASSWORD` → signed session token | Session token in `sessionStorage`; the GitHub write credential stays server-side. |
-| RAG retrieval | Browser (`src/lib/rag.ts`) | TF-IDF + parent/child chunking, no vector DB. |
+| RAG retrieval | Browser (`src/lib/rag.ts`) | BM25 + parent/child chunking over the blog posts, no vector DB. The chat lives on the blog pages (floating button). |
 | LLM call | Backend → OpenRouter | The key never ships to the browser. |
 | Profile | `src/content/profile.json` | Edit by hand, or from the admin panel, which commits the file for you. |
 

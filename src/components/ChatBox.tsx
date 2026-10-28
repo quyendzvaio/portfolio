@@ -36,7 +36,8 @@ export default function ChatBox() {
     setBusy(true)
     // Retrieval stays in the browser; only the model call goes to the backend, which
     // is what keeps the OpenRouter key out of the shipped JavaScript.
-    const hits = rerank(query, retrieve(query, getIndex()))
+    const index = getIndex()
+    const hits = rerank(query, retrieve(query, index), 3, index)
     // The model is only called when it has something to ground on: with no hits the
     // local "not found" answer is the right one and costs nothing. Repeated questions
     // in this visit reuse their answer.

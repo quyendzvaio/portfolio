@@ -73,21 +73,15 @@ export function getPosts(lang: Lang = getLang()): Post[] {
   return posts.sort((a, b) => (b.meta.date || '').localeCompare(a.meta.date || ''))
 }
 
-// Sync: rebuild the chunk index from current posts + profile, persist the timestamp.
-// One index per language, so a question is matched against the copy the reader sees.
+// Sync: rebuild the chunk index from the posts, persist the timestamp. The chat is the
+// blog's Q&A, so the index holds post text only: questions about the owner are out of
+// scope and get the "not in the blog" answer. One index per language, so a question is
+// matched against the copy the reader sees.
 export interface IndexMeta { syncedAt: string; chunkCount: number; postCount: number }
 const cache = new Map<Lang, Chunk[]>()
 
 export function buildIndex(lang: Lang = getLang()): Chunk[] {
   const chunks: Chunk[] = []
-  const p = getProfile(lang)
-  const extras = [
-    p.available ? `Availability: ${p.available}.` : '',
-    p.skills?.length ? `Skills: ${p.skills.join(', ')}.` : '',
-    p.stats?.length ? `Highlights: ${p.stats.map((s) => `${s.value} ${s.label}`).join('; ')}.` : '',
-  ].filter(Boolean).join(' ')
-  chunks.push(...chunkParentChild('Profile', 'profile',
-    `${p.name} ${p.role} ${p.intro} ${extras} Contact: LinkedIn ${p.linkedin}, phone ${p.phone}, email ${p.gmail}.`))
   const posts = getPosts(lang)
   for (const post of posts) {
     if (post.error) continue

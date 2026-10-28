@@ -10,9 +10,9 @@ Vite + React 19 + TS static frontend (`src/`) + small Node backend (`server/src/
 - Health check: `curl http://localhost:8787/api/health` → `{ok, storage, admin, llm}`.
 
 ## Structure (entrypoints)
-- `src/main.tsx` → `src/App.tsx`: hash router (`#/`, `#/blog`, `#/blog/:slug`, `#/chat`, `#/admin`). Hash routing is required for GitHub Pages (no server rewrites).
+- `src/main.tsx` → `src/App.tsx`: hash router (`#/`, `#/blog`, `#/blog/:slug`, `#/admin`; old `#/chat` links redirect to the blog with the chat open). Hash routing is required for GitHub Pages (no server rewrites).
 - `src/content/<slug>.md` + `<slug>.vi.md` = blog posts, English + Vietnamese (slug = filename, shared by both; frontmatter `title/date/tags/summary`, bundled at build). Diagrams live in `public/blog/`. `src/lib/i18n.ts` = EN/VI switch + interface strings; `getProfile()`/`getPosts()`/`getIndex()` default to the current language, so admin code must pass `'en'` explicitly. `src/content/profile.json` = single source for home page. Posts are git-only by design — admin panel never writes them.
-- `src/lib/rag.ts` = client-side TF-IDF retrieval (no vector DB); `src/lib/api.ts` + `src/lib/store.ts` = backend client / content store. `vite.config.ts` `base: './'` is required for Pages project sites — keep it.
+- `src/lib/rag.ts` = client-side BM25 retrieval over the blog posts (no vector DB); `src/lib/api.ts` + `src/lib/store.ts` = backend client / content store. `vite.config.ts` `base: './'` is required for Pages project sites — keep it.
 - `server/src/index.ts` = all routes; `server/src/env.ts` = config truth; `sanitize.ts` (profile/link allow-list), `auth.ts` (HMAC stateless sessions), `storage.ts` (Vercel Blob), `github.ts`, `llm.ts`.
 - Two TS projects: root `tsconfig.json` includes only `src`; `server/tsconfig.json` (`NodeNext`, outDir `server/dist`). Frontend `tsc` never checks `server/` and vice versa.
 

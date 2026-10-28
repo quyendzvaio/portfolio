@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { getProfile, getPosts, getIndexMeta } from './lib/store'
 import { mdToHtml } from './lib/markdown'
-import ChatBox from './components/ChatBox'
+import BlogChat, { setChatOpen } from './components/BlogChat'
 import Comments from './components/Comments'
 import SyncButton from './components/SyncButton'
 import Backdrop from './components/Backdrop'
@@ -21,6 +21,18 @@ function parseHash(): Route {
   return { page: page || 'home', slug }
 }
 
+// The chat used to be its own #/chat page; old links now land on the blog with the
+// chat panel open. Checked on load and on every hash change (back button, typed URL).
+function redirectOldChat(): void {
+  if (parseHash().page !== 'chat') return
+  setChatOpen(true)
+  window.history.replaceState(null, '', '#/blog')
+}
+redirectOldChat()
+
+/** Goes to the blog with the chat panel already open. */
+const askAboutBlog = () => setChatOpen(true)
+
 export default function App() {
   const [route, setRoute] = useState<Route>(parseHash)
   const motion = useMotion()
@@ -29,6 +41,7 @@ export default function App() {
   const t = useT()
   useEffect(() => {
     const onChange = () => {
+      redirectOldChat()
       setRoute(parseHash())
       window.scrollTo({ top: 0 })
     }
@@ -36,7 +49,6 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onChange)
   }, [])
   const profile = getProfile()
-  const posts = getPosts()
   useEffect(() => {
     document.title = profile.role ? `${profile.name} — ${profile.role}` : profile.name
   }, [profile.name, profile.role])
@@ -44,7 +56,6 @@ export default function App() {
   const nav = [
     { page: 'home', href: '#/', label: t('nav.home') },
     { page: 'blog', href: '#/blog', label: t('nav.blog') },
-    { page: 'chat', href: '#/chat', label: t('nav.chat') },
     { page: 'admin', href: '#/admin', label: t('nav.admin') },
   ]
 
@@ -74,15 +85,11 @@ export default function App() {
           {route.page === 'home' && <Home />}
           {route.page === 'blog' && !route.slug && <BlogList />}
           {route.page === 'blog' && route.slug && <Post slug={route.slug} />}
-          {route.page === 'chat' && (
-            <section className="card fade-in">
-              <h1>{t('chat.title')}</h1>
-              <p className="muted">{t('chat.sub', { n: posts.length })}</p>
-              <ChatBox />
-            </section>
-          )}
           {route.page === 'admin' && <Admin />}
         </main>
+
+        {/* One instance for every blog page, so the conversation survives moving between posts. */}
+        {route.page === 'blog' && <BlogChat />}
 
         <footer className="footer muted">
           <ContactLinks profile={profile} />
@@ -119,7 +126,7 @@ function Home() {
           <p className="hero-role" data-reveal style={delay(160)}>{p.role}</p>
           <p className="hero-intro" data-reveal style={delay(240)}>{p.intro}</p>
           <div className="hero-cta" data-reveal style={delay(320)}>
-            <a className="btn btn-neon" href="#/chat">{t('hero.ask')} <span aria-hidden="true">→</span></a>
+            <a className="btn btn-neon" href="#/blog" onClick={askAboutBlog}>{t('hero.ask')} <span aria-hidden="true">→</span></a>
             <a className="btn btn-ghost" href="#/blog">{t('hero.blog')}</a>
           </div>
           <div data-reveal style={delay(400)}><ContactLinks profile={p} /></div>
@@ -154,7 +161,7 @@ function Home() {
         <p className="kicker">{t('cta.kicker')}</p>
         <h2>{t('cta.title')}</h2>
         <p className="muted">{t('cta.body')}</p>
-        <a className="btn btn-neon" href="#/chat">{t('cta.button')} <span aria-hidden="true">→</span></a>
+        <a className="btn btn-neon" href="#/blog" onClick={askAboutBlog}>{t('cta.button')} <span aria-hidden="true">→</span></a>
       </section>
     </div>
   )

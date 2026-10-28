@@ -13,7 +13,7 @@ const REPLY_IN: Record<Lang, string> = { en: 'Answer in English.', vi: 'HÃ£y trá
 
 function systemPrompt(lang: Lang): string {
   return [
-    'You answer questions about this portfolio and its blog posts.',
+    'You answer questions about the blog posts on this site, using only what the posts say.',
     'Use ONLY the Context below. Cite every factual claim as [source title].',
     'If the answer is not in the Context, say so and suggest what to ask instead.',
     // The site's language switch decides, not the question: a visitor reading the
