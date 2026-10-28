@@ -182,7 +182,8 @@ export function rerank(query: string, hits: ScoredChunk[], top = 3, chunks?: Chu
 export function fallbackAnswer(query: string, top: ScoredChunk[]): string {
   if (!top.length) return t('chat.notFound', { q: query })
   const cites = [...new Set(top.map((c) => c.source))].map((s) => `[${s}]`).join(' ')
-  // Plain text in the chat bubble: drop the markdown markers the posts are written in.
+  // The bubble renders Markdown: strip the posts' own markers and keep each excerpt on
+  // one line so it stays a single list item.
   const plain = (text: string) => text.replace(/\*\*|`|(?<!\w)\*(?=\S)|(?<=\S)\*(?!\w)/g, '')
-  return `${t('chat.basedOn')}\n\n${top.map((c) => `• ${plain(c.text).slice(0, 450)}…`).join('\n')}\n\n${t('chat.sources')} ${cites}\n\n${t('chat.raw')}`
+  return `${t('chat.basedOn')}\n\n${top.map((c) => `- ${plain(c.text).replace(/\s+/g, ' ').slice(0, 450)}…`).join('\n')}\n\n${t('chat.sources')} ${cites}\n\n${t('chat.raw')}`
 }

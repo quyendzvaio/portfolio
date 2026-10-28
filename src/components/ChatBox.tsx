@@ -3,6 +3,7 @@ import { getIndex, syncIndex } from '../lib/store'
 import { retrieve, rerank, fallbackAnswer } from '../lib/rag'
 import { apiConfigured, askChat, getChatStatus } from '../lib/api'
 import { useLang, useT } from '../lib/i18n'
+import { mdToHtml } from '../lib/markdown'
 
 interface Msg { role: 'user' | 'ai'; text: string }
 
@@ -75,7 +76,11 @@ export default function ChatBox() {
       )}
       <div className="chat-log" role="log" aria-live="polite">
         {log.map((m, i) => (
-          <div key={i} className={`msg ${m.role}`}>{m.text}</div>
+          m.role === 'ai'
+            // Model answers come back as Markdown (lists, *emphasis*); the post renderer
+            // escapes HTML and drops unsafe links, so it is safe to reuse here.
+            ? <div key={i} className="msg ai md" dangerouslySetInnerHTML={{ __html: mdToHtml(m.text) }} />
+            : <div key={i} className="msg user">{m.text}</div>
         ))}
       </div>
       <div className="chat-input">
